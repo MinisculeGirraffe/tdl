@@ -1,0 +1,82 @@
+use anyhow::Error;
+use config::{Config, File, FileFormat};
+use serde::{Deserialize, Serialize};
+use std::env::var;
+use std::io::Write;
+use tokio::sync::RwLock;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Settings {
+    pub download_path: String,
+    pub audio_quality: i32,
+    pub show_progress: bool,
+    pub login_key: LoginKey,
+    pub api_key: ApiKey,
+}
+
+impl Settings {
+    pub fn save(&self) -> Result<(), Error> {
+        let config_file = get_config_file();
+        let config_dir = get_config_dir();
+        std::fs::create_dir_all(config_dir)?;
+        let mut file = std::fs::File::create(config_file)?;
+        let config_str = toml::to_string_pretty(&self)?;
+        file.write_all(config_str.as_bytes())?;
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LoginKey {
+    pub device_code: Option<String>,
+    pub user_id: Option<i64>,
+    pub country_code: Option<String>,
+    pub access_token: Option<String>,
+    pub refresh_token: Option<String>,
+    pub expires_after: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApiKey {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+pub fn get_config() -> Result<Settings, Error> {
+    let config = Config::builder()
+        .set_default("download_path", "./")?
+        .set_default("audio_quality", 3)?
+        .set_default("show_progress", false)?
+        .set_default("login_key.device_code", "")?
+        .set_default("login_key.country_code", "")?
+        .set_default("login_key.access_token", "")?
+        .set_default("login_key.refresh_token", "")?
+        .set_default("login_key.expires_after", 0)?
+        .set_default("api_key.client_id", "zU4XHVVkc2tDPo4t")?
+        .set_default(
+            "api_key.client_secret",
+            "VJKhDFqJPqvsPVNBV6ukXTJmwlvbttP7wlMlrc72se4=",
+        )?
+        .add_source(File::new(CONFIG_FILE.as_str(), FileFormat::Toml).required(false))
+        .build()?;
+    let settings: Settings = config.try_deserialize()?;
+    settings.save()?;
+
+    Ok(settings)
+}
+
+fn get_config_dir() -> String {
+    let config_dir =
+        var("XDG_CONFIG_HOME").unwrap_or_else(|_| var("HOME").unwrap_or_else(|_| "".to_string()));
+    format!("{}/.config/tidal-dl", config_dir)
+}
+
+fn get_config_file() -> String {
+    format!("{}/config.toml", get_config_dir())
+}
+
+lazy_static::lazy_static! {
+   pub static ref CONFIG_HOME: String = get_config_dir();
+   pub static ref CONFIG_FILE: String = get_config_file();
+   pub static ref CONFIG: RwLock<Settings> = RwLock::new(get_config().unwrap());
+}
