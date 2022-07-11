@@ -1,18 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use anyhow::Error;
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::config::CONFIG;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum AudioQuality {
-    Normal = 0,
-    High = 1,
-    HiFi = 2,
-    Master = 3,
-}
+use crate::{
+    config::CONFIG,
+    models::{Album, AssetPresentation, AudioQuality, PlaybackManifest, PlaybackMode, Track},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshResponse {
@@ -69,6 +64,9 @@ impl Default for DeviceAuthRequest {
     }
 }
 
+static API_BASE: &'static str = "https://api.tidalhifi.com/v1";
+static AUTH_BASE: &'static str = "https://auth.tidal.com/v1/oauth2";
+
 pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
     let config = CONFIG.read().await;
     println!("Getting device code...");
@@ -81,7 +79,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
     let body = serde_urlencoded::to_string(&data)?;
 
     let req = reqwest::Client::new()
-        .post("https://auth.tidal.com/v1/oauth2/device_authorization")
+        .post(format!("{}/device_authorization", &AUTH_BASE))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
@@ -98,7 +96,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
 
 pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
     let req = reqwest::Client::new()
-        .get("https://api.tidal.com/v1/sessions")
+        .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
         .send()
         .await?;
@@ -107,7 +105,7 @@ pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
 
 pub async fn login_access_token(access_token: &str, user_id: Option<&str>) -> Result<(), Error> {
     let req = reqwest::Client::new()
-        .get("https://api.tidal.com/v1/sessions")
+        .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
         .send()
         .await?
@@ -131,8 +129,8 @@ pub async fn login_access_token(access_token: &str, user_id: Option<&str>) -> Re
     config.save()?;
     Ok(())
 }
-pub async fn refresh_access_token(refresh_token: &str) -> Result<(), Error> {
-    let mut config = CONFIG.write().await;
+pub async fn refresh_access_token(refresh_token: &str) -> Result<RefreshResponse, Error> {
+    let config = CONFIG.read().await;
     let client_id = &config.api_key.client_id;
     let client_secret = &config.api_key.client_secret;
 
@@ -155,13 +153,7 @@ pub async fn refresh_access_token(refresh_token: &str) -> Result<(), Error> {
     if req.status().is_success() {
         let res = req.json::<RefreshResponse>().await?;
         let now = chrono::Utc::now().timestamp();
-        config.login_key.user_id = Some(res.user.user_id);
-        config.login_key.country_code = Some(res.user.country_code);
-        config.login_key.access_token = Some(res.access_token);
-        config.login_key.refresh_token = Some(res.refresh_token);
-        config.login_key.expires_after = Some(now + res.expires_in);
-        config.save()?;
-        Ok(())
+        Ok(res)
     } else {
         Err(Error::msg("Failed to refresh access token"))
     }
@@ -181,7 +173,7 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
     };
     let body = serde_urlencoded::to_string(&data)?;
     let req = reqwest::Client::new()
-        .post("https://auth.tidal.com/v1/oauth2/token")
+        .post(format!("{}/token", &AUTH_BASE))
         .basic_auth(client_id, Some(client_secret))
         .body(body)
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -199,4 +191,152 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
     println!("Got refresh response: {:?}", res);
 
     Ok(res)
+}
+
+pub async fn get_track(id: i64) -> Result<Track, Error> {
+    let config = CONFIG.read().await;
+    let token = config.login_key.access_token.as_ref().unwrap();
+    let url = format!("{}/tracks/{}", API_BASE, id);
+
+    let res = reqwest::Client::new()
+        .get(url)
+        .bearer_auth(token)
+        .send()
+        .await?
+        .json::<Track>()
+        .await?;
+
+    Ok(res)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all(deserialize = "camelCase"))]
+pub struct ItemResponse<T> {
+    limit: i64,
+    offset: i64,
+    total_number_of_items: i64,
+    items: Vec<ItemResponseItem<T>>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ItemResponseItem<T> {
+    item: T,
+    #[serde(alias = "type")]
+    item_type: String,
+}
+pub async fn get_items<'a, T>(url: &str) -> Result<Vec<T>, Error>
+where
+    T: DeserializeOwned + 'a,
+{
+    let config = CONFIG.read().await;
+    let limit = 50;
+    let mut offset = 0;
+    let params = &[
+        ("limit", limit.to_string()),
+        ("offset", offset.to_string()),
+        (
+            "countryCode",
+            config.login_key.country_code.as_ref().unwrap().to_owned(),
+        ),
+    ];
+    let mut result: Vec<T> = Vec::new();
+    loop {
+        let body = reqwest::Client::new()
+            .get(url)
+            .query(params)
+            .bearer_auth(config.login_key.access_token.as_ref().unwrap())
+            .send()
+            .await?
+            .json::<ItemResponse<T>>()
+            .await?;
+
+        let length = body.items.len();
+        for item in body.items {
+            result.push(item.item);
+        }
+        if length < 50 {
+            break;
+        }
+        offset += 50;
+    }
+    Ok(result)
+}
+
+pub async fn get_album(id: i64) -> Result<Album, Error> {
+    let config = CONFIG.read().await;
+    let token = config.login_key.access_token.as_ref().unwrap();
+    let country_code = config.login_key.country_code.as_ref().unwrap();
+    let url = format!("{}/albums/{}", API_BASE, id);
+
+    let res = reqwest::Client::new()
+        .get(url)
+        .bearer_auth(token)
+        .query(&[("countryCode", country_code)])
+        .send()
+        .await?
+        .json::<Album>()
+        .await?;
+    Ok(res)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all(deserialize = "camelCase"))]
+struct PlaybackInfoPostPaywallRes {
+    track_id: i64,
+    asset_presentation: AssetPresentation,
+    audio_quality: AudioQuality,
+    manifest_mime_type: String,
+    manifest: String,
+}
+
+pub async fn get_stream_url(id: i64) -> Result<PlaybackManifest, Error> {
+    let config = CONFIG.read().await;
+
+    let url = format!("{}/tracks/{}/playbackinfopostpaywall", &API_BASE, id);
+    let query = &[
+        (
+            "countryCode",
+            config.login_key.country_code.as_ref().unwrap(),
+        ),
+        ("audioquality", &config.audio_quality.to_string()),
+        ("playbackmode", &PlaybackMode::Stream.to_string()),
+        ("assetpresentation", &AssetPresentation::Full.to_string()),
+    ];
+    let req = reqwest::Client::new()
+        .get(url)
+        .query(query)
+        .bearer_auth(config.login_key.access_token.as_ref().unwrap())
+        .send()
+        .await?
+        .json::<PlaybackInfoPostPaywallRes>()
+        .await?;
+
+    match req.manifest_mime_type.as_str() {
+        "application/vnd.tidal.bts" => Ok(PlaybackManifest::from_str(&req.manifest)?),
+        _ => Err(Error::msg("Incorrect Mimetype on Response")),
+    }
+}
+
+pub fn get_cover_url(id: &str, width: i64, height: i64) -> String {
+    format!(
+        "https://resources.tidal.com/images/{}/{}x{}.jpg",
+        id.replace("-", "/"),
+        width,
+        height
+    )
+}
+pub struct Cover {
+    pub content_type: String,
+    pub data: Vec<u8>,
+}
+pub async fn get_cover_data(id: &str) -> Result<Cover, Error> {
+    let req = reqwest::get(get_cover_url(id, 1280, 1280)).await?;
+    let content_type = req
+        .headers()
+        .get("Content-Type")
+        .unwrap()
+        .to_str()?
+        .to_string();
+    let data = req.bytes().await?.to_vec();
+
+    Ok(Cover { content_type, data })
 }

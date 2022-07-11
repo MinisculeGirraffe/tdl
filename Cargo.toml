@@ -18,3 +18,11 @@ lazy_static = "1.4.0"
 notify = "4.0.17"
 toml = "0.5.9"
 chrono = "0.4.19"
+base64 = "0.13.0"
+rust-crypto = "0.2.36"
+shellexpand = "2.1.0"
+regex = "1.6.0"
+metaflac = "0.2.5"
+[dependencies.serde_with]
+version = "1.14.0"
+features = [ "chrono" ]

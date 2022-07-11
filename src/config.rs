@@ -1,14 +1,18 @@
 use anyhow::Error;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use serde_with::NoneAsEmptyString;
 use std::env::var;
 use std::io::Write;
 use tokio::sync::RwLock;
 
+use crate::models::AudioQuality;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub download_path: String,
-    pub audio_quality: i32,
+    pub audio_quality: AudioQuality,
     pub show_progress: bool,
     pub login_key: LoginKey,
     pub api_key: ApiKey,
@@ -25,13 +29,17 @@ impl Settings {
         Ok(())
     }
 }
-
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LoginKey {
+    #[serde_as(as = "NoneAsEmptyString")]
     pub device_code: Option<String>,
     pub user_id: Option<i64>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub country_code: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub access_token: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub refresh_token: Option<String>,
     pub expires_after: Option<i64>,
 }
@@ -44,8 +52,8 @@ pub struct ApiKey {
 
 pub fn get_config() -> Result<Settings, Error> {
     let config = Config::builder()
-        .set_default("download_path", "./")?
-        .set_default("audio_quality", 3)?
+        .set_default("download_path", "$HOME/Music/{artist}/{album}/{track_num} - {track_name}")?
+        .set_default("audio_quality", "LOSSLESS")?
         .set_default("show_progress", false)?
         .set_default("login_key.device_code", "")?
         .set_default("login_key.country_code", "")?
