@@ -1441,6 +1441,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "tdl"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "chrono",
+ "clap",
+ "config",
+ "lazy_static",
+ "metaflac",
+ "notify",
+ "regex",
+ "reqwest",
+ "rust-crypto",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_with",
+ "shellexpand",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1487,30 +1511,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tidal-dl"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "chrono",
- "clap",
- "config",
- "lazy_static",
- "metaflac",
- "notify",
- "regex",
- "reqwest",
- "rust-crypto",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "serde_with",
- "shellexpand",
- "tokio",
- "toml",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 [package]
-name = "tidal-dl"
+name = "tdl"
 version = "0.1.0"
 edition = "2021"
 
@@ -23,6 +23,11 @@ rust-crypto = "0.2.36"
 shellexpand = "2.1.0"
 regex = "1.6.0"
 metaflac = "0.2.5"
+
 [dependencies.serde_with]
 version = "1.14.0"
 features = [ "chrono" ]
+
+[profile.release]
+opt-level = 3
+lto = true

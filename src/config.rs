@@ -52,7 +52,10 @@ pub struct ApiKey {
 
 pub fn get_config() -> Result<Settings, Error> {
     let config = Config::builder()
-        .set_default("download_path", "$HOME/Music/{artist}/{album}/{track_num} - {track_name}")?
+        .set_default(
+            "download_path",
+            "$HOME/Music/{artist}/{album}/{track_num} - {track_name}",
+        )?
         .set_default("audio_quality", "LOSSLESS")?
         .set_default("show_progress", false)?
         .set_default("login_key.device_code", "")?

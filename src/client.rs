@@ -64,8 +64,8 @@ impl Default for DeviceAuthRequest {
     }
 }
 
-static API_BASE: &'static str = "https://api.tidalhifi.com/v1";
-static AUTH_BASE: &'static str = "https://auth.tidal.com/v1/oauth2";
+static API_BASE: &str = "https://api.tidalhifi.com/v1";
+static AUTH_BASE: & str = "https://auth.tidal.com/v1/oauth2";
 
 pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
     let config = CONFIG.read().await;
@@ -103,7 +103,7 @@ pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
     Ok(req.status().is_success())
 }
 
-pub async fn login_access_token(access_token: &str, user_id: Option<&str>) -> Result<(), Error> {
+pub async fn _login_access_token(access_token: &str, user_id: Option<&str>) -> Result<(), Error> {
     let req = reqwest::Client::new()
         .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
@@ -152,7 +152,6 @@ pub async fn refresh_access_token(refresh_token: &str) -> Result<RefreshResponse
         .await?;
     if req.status().is_success() {
         let res = req.json::<RefreshResponse>().await?;
-        let now = chrono::Utc::now().timestamp();
         Ok(res)
     } else {
         Err(Error::msg("Failed to refresh access token"))
@@ -193,7 +192,7 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
     Ok(res)
 }
 
-pub async fn get_track(id: i64) -> Result<Track, Error> {
+pub async fn _get_track(id: i64) -> Result<Track, Error> {
     let config = CONFIG.read().await;
     let token = config.login_key.access_token.as_ref().unwrap();
     let url = format!("{}/tracks/{}", API_BASE, id);
@@ -319,7 +318,7 @@ pub async fn get_stream_url(id: i64) -> Result<PlaybackManifest, Error> {
 pub fn get_cover_url(id: &str, width: i64, height: i64) -> String {
     format!(
         "https://resources.tidal.com/images/{}/{}x{}.jpg",
-        id.replace("-", "/"),
+        id.replace('-', "/"),
         width,
         height
     )

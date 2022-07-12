@@ -3,7 +3,7 @@ use crypto::buffer::{BufferResult, ReadBuffer, WriteBuffer};
 use crypto::symmetriccipher::{Decryptor, SymmetricCipherError};
 use crypto::{aes, blockmodes, buffer};
 
-static MASTER_KEY: &'static str = "UIlTTEMmmLfGowo/UC60x2H45W6MdGgTRfo/umg4754=";
+static MASTER_KEY: &str = "UIlTTEMmmLfGowo/UC60x2H45W6MdGgTRfo/umg4754=";
 
 fn decrypt(
     encrypted_data: &[u8],
@@ -34,17 +34,17 @@ fn decrypt(
 
 pub fn decrypt_security_token(security_token: &str) -> Result<([u8; 16], [u8; 8]), Error> {
     let master_key = base64::decode(MASTER_KEY)?;
-    let mut security_key = base64::decode(security_token)?;
+    let security_key = base64::decode(security_token)?;
     let iv = &security_key[..15];
     let enc_token = &security_key[16..];
-    let mut decryptor = aes::cbc_decryptor(
+    let decryptor = aes::cbc_decryptor(
         aes::KeySize::KeySize256,
         &master_key,
         iv,
         blockmodes::NoPadding,
     );
     let decrypted_token = decrypt(enc_token, decryptor).unwrap();
-    let key_slice = &decrypted_token[..15];
+    let _key_slice = &decrypted_token[..15];
 
     let key: [u8; 16] = decrypted_token[..15].try_into()?;
     let nonce: [u8; 8] = decrypted_token[16..24].try_into()?;

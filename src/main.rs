@@ -6,25 +6,85 @@ mod decryption;
 mod download;
 mod login;
 mod models;
-use download::download_track;
+use std::fmt;
 
-use crate::client::{get_album, get_items, get_stream_url};
+use std::str::FromStr;
+
 use crate::login::*;
-use crate::models::Track;
+use anyhow::Error;
+use clap::{arg, Command};
+use download::download_album;
 
 #[tokio::main]
 async fn main() {
+    let matches = Command::new("tdl")
+        .version("0.1")
+        .author("Daniel Norred")
+        .about("Command Line Tidal Song Downloader")
+        .arg(arg!(--url <VALUE>).help("Tidal URL to Song/Album/Artist"))
+        .get_matches();
+
     match login().await {
         Ok(res) => println!("Logged in: {}", res),
-        Err(e) => eprintln!("{}", e.to_string()),
+        Err(e) => eprintln!("{}", e),
+    };
+    let url = matches.get_one::<String>("url").expect("required");
+    let action = Action::from_str(url).expect("invalid URL supplied");
+    println!("{:?}", action);
+    dispatch_action(action).await.unwrap();
+}
+#[derive(Debug)]
+struct Action {
+    kind: ActionKind,
+    id: i64,
+}
+impl FromStr for Action {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let url_parts: Vec<&str> = s.split('/').collect();
+        let [kind, id]: [_; 2] = url_parts[url_parts.len() - 2..].try_into()?;
+        Ok(Self {
+            kind: ActionKind::from_str(kind)?,
+            id: i64::from_str(id)?,
+        })
     }
-    //https://tidal.com/browse/album/86697999
-    let album = get_album(86697999).await.unwrap();
-    let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
-    let tracks = get_items::<Track>(&url).await.unwrap();
-    for track in tracks {
-        download_track(track).await;
+}
+#[derive(Debug)]
+enum ActionKind {
+    Track,
+    Album,
+    Artist,
+}
+impl FromStr for ActionKind {
+    type Err = Error;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "track" => Ok(ActionKind::Track),
+            "album" => Ok(ActionKind::Album),
+            "artist" => Ok(ActionKind::Artist),
+            _ => Err(Error::msg("No action kind for type")),
+        }
     }
-   // let resp = get_stream_url(38519997).await.unwrap();
-   // println!("{:?}", resp);
+}
+
+impl fmt::Display for ActionKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let str = match self {
+            ActionKind::Track => "track",
+            ActionKind::Album => "album",
+            ActionKind::Artist => "artist",
+        };
+        fmt.write_str(str)?;
+        Ok(())
+    }
+}
+
+async fn dispatch_action(action: Action) -> Result<bool, Error> {
+    // let url = format!("https://api.tidal.com/v1/{}/{}",action.kind.to_string(),action.id);
+
+    match action.kind {
+        ActionKind::Track => todo!(),
+        ActionKind::Album => download_album(action.id).await,
+        ActionKind::Artist => todo!(),
+    }
 }
