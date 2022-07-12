@@ -7,14 +7,14 @@ Configs are stored in `~/.config/tidal-dl/config.toml`
 ## Config Setup
 
 `download_path` will expand env variables along with shell accelerators such at `~`. In addition to specify the format to save tracks in, you can use the following tokens
-Artist: 
+- Artist: 
 `{artist}`
 `{artist_id}`
-Album: 
+- Album: 
 `{album}`
 `{album_id}`
 
-Track:
+- Track:
 `{track_num}`
 `{track_name}`
 `{track_id}`
@@ -32,4 +32,4 @@ Example Values:
 - `HIGH`
 - `LOW`
 
-``
+
