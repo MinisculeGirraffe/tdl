@@ -1,13 +1,11 @@
-use std::{collections::HashMap, str::FromStr};
-
-use anyhow::Error;
-
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
 use crate::{
     config::CONFIG,
     models::{Album, AssetPresentation, AudioQuality, PlaybackManifest, PlaybackMode, Track},
 };
+use anyhow::Error;
+use log::{debug, info};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshResponse {
@@ -65,11 +63,11 @@ impl Default for DeviceAuthRequest {
 }
 
 static API_BASE: &str = "https://api.tidalhifi.com/v1";
-static AUTH_BASE: & str = "https://auth.tidal.com/v1/oauth2";
+static AUTH_BASE: &str = "https://auth.tidal.com/v1/oauth2";
 
 pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
     let config = CONFIG.read().await;
-    println!("Getting device code...");
+    info!("Getting device code...");
     let client_id = config.api_key.client_id.clone();
     let data = DeviceAuthRequest {
         client_id: client_id.clone(),
@@ -90,7 +88,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
     }
 
     let device_key = req.json::<DeviceAuthResponse>().await?;
-    println!("Got device code: {:?}", device_key);
+    info!("Got device code: {:?}", device_key);
     Ok(device_key)
 }
 
@@ -122,7 +120,7 @@ pub async fn _login_access_token(access_token: &str, user_id: Option<&str>) -> R
         }
     }
     let mut config = CONFIG.write().await;
-    println!("got config lock");
+    debug!("got config lock");
     //config.login_key.user_id = Some(req.get("userId"));
     config.login_key.country_code = Some(req.get("countryCode").unwrap().to_string());
     config.login_key.access_token = Some(access_token.to_string());
@@ -182,17 +180,17 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
         if req.status().is_client_error() {
             return Err(Error::msg(req.status().canonical_reason().unwrap()));
         } else {
-            println!("{:?}", req.status());
+            debug!("{:?}", req.status());
             return Err(Error::msg("Failed to check auth status"));
         }
     }
     let res = req.json::<RefreshResponse>().await?;
-    println!("Got refresh response: {:?}", res);
+    info!("Got refresh response: {:?}", res);
 
     Ok(res)
 }
 
-pub async fn _get_track(id: i64) -> Result<Track, Error> {
+pub async fn get_track(id: i64) -> Result<Track, Error> {
     let config = CONFIG.read().await;
     let token = config.login_key.access_token.as_ref().unwrap();
     let url = format!("{}/tracks/{}", API_BASE, id);
@@ -200,6 +198,10 @@ pub async fn _get_track(id: i64) -> Result<Track, Error> {
     let res = reqwest::Client::new()
         .get(url)
         .bearer_auth(token)
+        .query(&[(
+            "countryCode",
+            config.login_key.country_code.as_ref().unwrap(),
+        )])
         .send()
         .await?
         .json::<Track>()
@@ -214,13 +216,13 @@ pub struct ItemResponse<T> {
     limit: i64,
     offset: i64,
     total_number_of_items: i64,
-    items: Vec<ItemResponseItem<T>>,
+    items: Vec<T>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ItemResponseItem<T> {
-    item: T,
+    pub item: T,
     #[serde(alias = "type")]
-    item_type: String,
+    pub item_type: String,
 }
 pub async fn get_items<'a, T>(url: &str) -> Result<Vec<T>, Error>
 where
@@ -245,12 +247,16 @@ where
             .bearer_auth(config.login_key.access_token.as_ref().unwrap())
             .send()
             .await?
-            .json::<ItemResponse<T>>()
+            .text()
             .await?;
 
-        let length = body.items.len();
-        for item in body.items {
-            result.push(item.item);
+        debug!("{}", &body);
+
+        let json = serde_json::from_str::<ItemResponse<T>>(&body)?;
+
+        let length = json.items.len();
+        for item in json.items {
+            result.push(item);
         }
         if length < 50 {
             break;

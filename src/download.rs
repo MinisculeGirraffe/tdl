@@ -1,16 +1,17 @@
-use anyhow::Error;
-use metaflac::block::PictureType::CoverFront;
-use metaflac::Tag;
-use regex::{Captures, Regex};
-use std::path::Path;
-
-use crate::client::{get_album, get_cover_data, get_items};
+use crate::client::{get_album, get_cover_data, get_items, get_track, ItemResponseItem};
+use crate::models::Album;
 use crate::{
     client,
     config::CONFIG,
     decryption::{decrypt_file, decrypt_security_token},
     models::{PlaybackManifest, Track},
 };
+use anyhow::Error;
+use log::{debug, info};
+use metaflac::block::PictureType::CoverFront;
+use metaflac::Tag;
+use regex::{Captures, Regex};
+use std::path::Path;
 
 async fn remove_encryption(
     stream: PlaybackManifest,
@@ -24,20 +25,21 @@ async fn remove_encryption(
         tokio::fs::write(dst, res).await?;
         return Ok(());
     }
-    println!("No encryption key. Writing {} bytes directly", src.len());
+    debug!("No encryption key. Writing {} bytes directly", src.len());
     tokio::fs::write(dst, src).await?;
     Ok(())
 }
 
-pub async fn download_track(track: Track) -> Result<(), Error> {
+pub async fn download_track(id: i64) -> Result<bool, Error> {
+    let track = get_track(id).await?;
     let path_str = get_path(&track).await?;
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
-        println!("File already downloaded");
-        return Ok(());
+        info!("File already downloaded");
+        return Ok(false);
     }
     let stream = client::get_stream_url(track.id).await?;
-    println!("Downloading {} - {}", track.artist.name, track.title);
+    info!("Downloading {} - {}", track.artist.name, track.title);
     let dl_url = &stream.urls[0];
     let response = reqwest::Client::new()
         .get(dl_url)
@@ -46,19 +48,28 @@ pub async fn download_track(track: Track) -> Result<(), Error> {
         .bytes()
         .await?
         .to_vec();
-    println!("Downloaded {:.2} MiB", response.len() as f64 / 1.049e6);
+    info!("Downloaded {:.2} MiB", response.len() as f64 / 1.049e6);
     remove_encryption(stream, response, dl_path).await?;
     get_meta(track, dl_path).await?;
-    Ok(())
+    Ok(true)
 }
 
 pub async fn download_album(id: i64) -> Result<bool, Error> {
     //https://tidal.com/browse/album/86697999
     let album = get_album(id).await.unwrap();
     let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
-    let tracks = get_items::<Track>(&url).await.unwrap();
+    let tracks = get_items::<ItemResponseItem<Track>>(&url).await?;
     for track in tracks {
-        download_track(track).await?;
+        download_track(track.item.id).await?;
+    }
+    Ok(true)
+}
+pub async fn download_artist(id: i64) -> Result<bool, Error> {
+    let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
+    let albums = get_items::<Album>(&url).await?;
+    debug!("Got Albums successfully");
+    for album in albums {
+        download_album(album.id).await?;
     }
     Ok(true)
 }
@@ -102,6 +113,6 @@ async fn get_meta(track: Track, path: &Path) -> Result<(), Error> {
     let cover = get_cover_data(&track.album.cover).await?;
     tag.add_picture(cover.content_type, CoverFront, cover.data);
     tag.save()?;
-    println!("Metadata written to file");
+    info!("Metadata written to file");
     Ok(())
 }

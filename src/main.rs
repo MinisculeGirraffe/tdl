@@ -13,7 +13,8 @@ use std::str::FromStr;
 use crate::login::*;
 use anyhow::Error;
 use clap::{arg, Command};
-use download::download_album;
+use download::{download_album, download_artist, download_track};
+use env_logger::Env;
 
 #[tokio::main]
 async fn main() {
@@ -23,6 +24,8 @@ async fn main() {
         .about("Command Line Tidal Song Downloader")
         .arg(arg!(--url <VALUE>).help("Tidal URL to Song/Album/Artist"))
         .get_matches();
+
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     match login().await {
         Ok(res) => println!("Logged in: {}", res),
@@ -83,8 +86,8 @@ async fn dispatch_action(action: Action) -> Result<bool, Error> {
     // let url = format!("https://api.tidal.com/v1/{}/{}",action.kind.to_string(),action.id);
 
     match action.kind {
-        ActionKind::Track => todo!(),
+        ActionKind::Track => download_track(action.id).await,
         ActionKind::Album => download_album(action.id).await,
-        ActionKind::Artist => todo!(),
+        ActionKind::Artist => download_artist(action.id).await,
     }
 }
