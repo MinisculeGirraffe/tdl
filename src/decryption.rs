@@ -21,7 +21,7 @@ fn decrypt(
                 .take_read_buffer()
                 .take_remaining()
                 .iter()
-                .copied()
+                .copied(),
         );
         match result {
             BufferResult::BufferUnderflow => break,
