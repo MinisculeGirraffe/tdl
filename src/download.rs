@@ -30,7 +30,7 @@ async fn remove_encryption(
     Ok(())
 }
 
-pub async fn download_track(id: i64) -> Result<bool, Error> {
+pub async fn download_track(id: usize) -> Result<bool, Error> {
     let config = CONFIG.read().await;
     let track = get_track(id).await?;
     let path_str = get_path(&track).await?;
@@ -64,7 +64,7 @@ pub async fn download_track(id: i64) -> Result<bool, Error> {
     Ok(true)
 }
 
-pub async fn download_album(id: i64) -> Result<bool, Error> {
+pub async fn download_album(id: usize) -> Result<bool, Error> {
     //https://tidal.com/browse/album/86697999
     let album = get_album(id).await.unwrap();
     let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
@@ -75,7 +75,7 @@ pub async fn download_album(id: i64) -> Result<bool, Error> {
 
     Ok(true)
 }
-pub async fn download_artist(id: i64) -> Result<bool, Error> {
+pub async fn download_artist(id: usize) -> Result<bool, Error> {
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
     let albums = get_items::<Album>(&url).await?;
     debug!("Got Albums successfully");

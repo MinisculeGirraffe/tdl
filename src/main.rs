@@ -39,7 +39,7 @@ async fn main() {
 #[derive(Debug)]
 struct Action {
     kind: ActionKind,
-    id: i64,
+    id: usize,
 }
 impl FromStr for Action {
     type Err = Error;
@@ -48,7 +48,7 @@ impl FromStr for Action {
         let [kind, id]: [_; 2] = url_parts[url_parts.len() - 2..].try_into()?;
         Ok(Self {
             kind: ActionKind::from_str(kind)?,
-            id: i64::from_str(id)?,
+            id: usize::from_str(id)?,
         })
     }
 }

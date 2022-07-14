@@ -190,7 +190,7 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
     Ok(res)
 }
 
-pub async fn get_track(id: i64) -> Result<Track, Error> {
+pub async fn get_track(id: usize) -> Result<Track, Error> {
     let config = CONFIG.read().await;
     let token = config.login_key.access_token.as_ref().unwrap();
     let url = format!("{}/tracks/{}", API_BASE, id);
@@ -213,9 +213,9 @@ pub async fn get_track(id: i64) -> Result<Track, Error> {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct ItemResponse<T> {
-    limit: i64,
-    offset: i64,
-    total_number_of_items: i64,
+    limit: usize,
+    offset: usize,
+    total_number_of_items: usize,
     items: Vec<T>,
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -266,7 +266,7 @@ where
     Ok(result)
 }
 
-pub async fn get_album(id: i64) -> Result<Album, Error> {
+pub async fn get_album(id: usize) -> Result<Album, Error> {
     let config = CONFIG.read().await;
     let token = config.login_key.access_token.as_ref().unwrap();
     let country_code = config.login_key.country_code.as_ref().unwrap();
@@ -286,14 +286,14 @@ pub async fn get_album(id: i64) -> Result<Album, Error> {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct PlaybackInfoPostPaywallRes {
-    track_id: i64,
+    track_id: usize,
     asset_presentation: AssetPresentation,
     audio_quality: AudioQuality,
     manifest_mime_type: String,
     manifest: String,
 }
 
-pub async fn get_stream_url(id: i64) -> Result<PlaybackManifest, Error> {
+pub async fn get_stream_url(id: usize) -> Result<PlaybackManifest, Error> {
     let config = CONFIG.read().await;
 
     let url = format!("{}/tracks/{}/playbackinfopostpaywall", &API_BASE, id);
@@ -321,7 +321,7 @@ pub async fn get_stream_url(id: i64) -> Result<PlaybackManifest, Error> {
     }
 }
 
-pub fn get_cover_url(id: &str, width: i64, height: i64) -> String {
+pub fn get_cover_url(id: &str, width: usize, height: usize) -> String {
     format!(
         "https://resources.tidal.com/images/{}/{}x{}.jpg",
         id.replace('-', "/"),
