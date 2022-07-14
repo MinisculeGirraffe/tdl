@@ -21,7 +21,7 @@ fn decrypt(
                 .take_read_buffer()
                 .take_remaining()
                 .iter()
-                .map(|&i| i),
+                .copied()
         );
         match result {
             BufferResult::BufferUnderflow => break,
@@ -71,7 +71,7 @@ pub async fn decrypt_file(
                 .take_read_buffer()
                 .take_remaining()
                 .iter()
-                .map(|&i| i),
+                .copied(),
         );
         match result {
             BufferResult::BufferUnderflow => break,
