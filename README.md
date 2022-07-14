@@ -27,9 +27,9 @@ Example Values:
 
 
 `audio_quality` expects one of the following values ordered in descending quality:
-- `HI_RES`
-- `LOSSLESS`
-- `HIGH`
-- `LOW`
+- `HI_RES` (24bit/96kHz MQA encoded FLAC)
+- `LOSSLESS` (1411kbps|16bit/44.1kHz FLAC/ALAC)
+- `HIGH` (320kbps AAC)
+- `LOW` (96kbps AAC)
 
 
