@@ -31,8 +31,14 @@ async fn remove_encryption(
 }
 
 pub async fn download_track(id: i64) -> Result<bool, Error> {
+    let config = CONFIG.read().await;
     let track = get_track(id).await?;
     let path_str = get_path(&track).await?;
+
+    if config.download_cover {
+        let _ = download_cover(&track).await;
+    }
+
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
         info!("File already downloaded");
@@ -48,7 +54,11 @@ pub async fn download_track(id: i64) -> Result<bool, Error> {
         .bytes()
         .await?
         .to_vec();
-    info!("Downloaded {:.2} MiB", response.len() as f64 / 1.049e6);
+    info!(
+        "Downloaded {:.2} MiB to {}",
+        response.len() as f64 / 1.049e6,
+        path_str
+    );
     remove_encryption(stream, response, dl_path).await?;
     get_meta(track, dl_path).await?;
     Ok(true)
@@ -62,6 +72,7 @@ pub async fn download_album(id: i64) -> Result<bool, Error> {
     for track in tracks {
         download_track(track.item.id).await?;
     }
+
     Ok(true)
 }
 pub async fn download_artist(id: i64) -> Result<bool, Error> {
@@ -85,15 +96,16 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     let track_id = &track.id.to_string();
     let artist_id = &track.artist.id.to_string();
     let album_id = &track.album.id.to_string();
+
     let replaced = re.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
-        "{artist}" => &track.artist.name,
-        "{artist_id}" => artist_id,
-        "{album}" => &track.album.title,
-        "{album_id}" => album_id,
-        "{track_num}" => track_num_str,
-        "{track_name}" => &track.title,
-        "{track_id}" => track_id,
-        "{quality}" => track_quality,
+        "{artist}" => sanitize_filename::sanitize(&track.artist.name),
+        "{artist_id}" => sanitize_filename::sanitize(artist_id),
+        "{album}" => sanitize_filename::sanitize(&track.album.title),
+        "{album_id}" => sanitize_filename::sanitize(album_id),
+        "{track_num}" => sanitize_filename::sanitize(track_num_str),
+        "{track_name}" => sanitize_filename::sanitize(&track.title),
+        "{track_id}" => sanitize_filename::sanitize(track_id),
+        "{quality}" => sanitize_filename::sanitize(track_quality),
         _ => panic!("matched no tokens on download_path string"),
     });
 
@@ -114,5 +126,17 @@ async fn get_meta(track: Track, path: &Path) -> Result<(), Error> {
     tag.add_picture(cover.content_type, CoverFront, cover.data);
     tag.save()?;
     info!("Metadata written to file");
+    Ok(())
+}
+
+pub async fn download_cover(track: &Track) -> Result<(), Error> {
+    let path_str = get_path(track).await?;
+    let dl_path = Path::new(&path_str).parent().unwrap().join("cover.jpg");
+    if dl_path.exists() {
+        return Ok(());
+    }
+    let cover = get_cover_data(&track.album.cover).await?;
+    tokio::fs::write(dl_path, cover.data).await?;
+    info!("Write cover to disk");
     Ok(())
 }

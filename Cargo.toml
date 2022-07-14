@@ -25,6 +25,7 @@ regex = "1.6.0"
 metaflac = "0.2.5"
 log = "0.4.17"
 env_logger = "0.9.0"
+sanitize-filename = "0.4.0"
 [dependencies.serde_with]
 version = "1.14.0"
 features = [ "chrono" ]

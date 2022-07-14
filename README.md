@@ -33,3 +33,4 @@ Example Values:
 - `LOW` (96kbps AAC)
 
 
+`download_cover` Download a cover.jpg in an album folder
