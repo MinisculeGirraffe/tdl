@@ -2,7 +2,6 @@ extern crate crypto;
 
 mod client;
 mod config;
-mod decryption;
 mod download;
 mod login;
 mod models;
@@ -15,6 +14,7 @@ use anyhow::Error;
 use clap::{arg, Command};
 use download::{download_album, download_artist, download_track};
 use env_logger::Env;
+use log::info;
 
 #[tokio::main]
 async fn main() {
@@ -28,18 +28,17 @@ async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     match login().await {
-        Ok(res) => println!("Logged in: {}", res),
+        Ok(res) => info!("Logged in: {}", res),
         Err(e) => eprintln!("{}", e),
     };
     let url = matches.get_one::<String>("url").expect("required");
     let action = Action::from_str(url).expect("invalid URL supplied");
-    println!("{:?}", action);
     dispatch_action(action).await.unwrap();
 }
 #[derive(Debug)]
 struct Action {
     kind: ActionKind,
-    id: i64,
+    id: usize,
 }
 impl FromStr for Action {
     type Err = Error;
@@ -48,7 +47,7 @@ impl FromStr for Action {
         let [kind, id]: [_; 2] = url_parts[url_parts.len() - 2..].try_into()?;
         Ok(Self {
             kind: ActionKind::from_str(kind)?,
-            id: i64::from_str(id)?,
+            id: usize::from_str(id)?,
         })
     }
 }

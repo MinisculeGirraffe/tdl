@@ -1,38 +1,33 @@
 use crate::client::{get_album, get_cover_data, get_items, get_track, ItemResponseItem};
 use crate::models::Album;
-use crate::{
-    client,
-    config::CONFIG,
-    decryption::{decrypt_file, decrypt_security_token},
-    models::{PlaybackManifest, Track},
-};
+use crate::{client, config::CONFIG, models::Track};
+use anyhow::anyhow;
 use anyhow::Error;
+use futures::stream;
+use futures::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
 use regex::{Captures, Regex};
+use std::cmp::min;
 use std::path::Path;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
-async fn remove_encryption(
-    stream: PlaybackManifest,
-    src: Vec<u8>,
-    dst: &Path,
-) -> Result<(), Error> {
-    tokio::fs::create_dir_all(dst.parent().unwrap()).await?;
-    if stream.key_id.is_some() {
-        let (key, nonce) = decrypt_security_token(&stream.key_id.unwrap())?;
-        let res = decrypt_file(src, key, nonce).await.unwrap();
-        tokio::fs::write(dst, res).await?;
-        return Ok(());
-    }
-    debug!("No encryption key. Writing {} bytes directly", src.len());
-    tokio::fs::write(dst, src).await?;
-    Ok(())
-}
+pub async fn download_track(id: usize) -> Result<bool, Error> {
+    let pb = ProgressBar::new(0);
+    pb.set_style(ProgressStyle::default_bar()
+    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})")
+    .progress_chars("#>-"));
 
-pub async fn download_track(id: i64) -> Result<bool, Error> {
     let config = CONFIG.read().await;
     let track = get_track(id).await?;
+    pb.set_message(format!(
+        "Downloading File | [{}] {} - {}",
+        track.track_number, track.artist.name, track.title
+    ));
+
     let path_str = get_path(&track).await?;
 
     if config.download_cover {
@@ -41,41 +36,66 @@ pub async fn download_track(id: i64) -> Result<bool, Error> {
 
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
-        info!("File already downloaded");
+        pb.finish_with_message(format!(
+            "File Already Exists | {} | Elapsed: {:.2?}",
+            &path_str,
+            pb.elapsed()
+        ));
         return Ok(false);
     }
     let stream = client::get_stream_url(track.id).await?;
-    info!("Downloading {} - {}", track.artist.name, track.title);
     let dl_url = &stream.urls[0];
-    let response = reqwest::Client::new()
-        .get(dl_url)
-        .send()
-        .await?
-        .bytes()
-        .await?
-        .to_vec();
-    info!(
-        "Downloaded {:.2} MiB to {}",
-        response.len() as f64 / 1.049e6,
-        path_str
-    );
-    remove_encryption(stream, response, dl_path).await?;
+    let response = reqwest::Client::new().get(dl_url).send().await?;
+
+    let total_size: u64 = response
+        .content_length()
+        .ok_or_else(|| anyhow!("Failed to get content length from {}", dl_url))?;
+
+    pb.set_length(total_size);
+
+    debug!("Creating File path {}", &dl_path.display());
+    tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
+    let mut file = File::create(dl_path).await?;
+    let mut downloaded: u64 = 0;
+    let mut stream = response.bytes_stream();
+    while let Some(item) = stream.next().await {
+        let chunk = item?;
+        file.write_all(&chunk).await?;
+        downloaded = min(downloaded + (chunk.len() as u64), total_size);
+        pb.set_position(downloaded)
+    }
+    pb.finish_with_message(format!(
+        "Download Complete | [{}] {} - {} | Elapsed: {:.2?}",
+        track.track_number,
+        track.artist.name,
+        track.title,
+        pb.elapsed()
+    ));
     get_meta(track, dl_path).await?;
     Ok(true)
 }
 
-pub async fn download_album(id: i64) -> Result<bool, Error> {
+pub async fn download_album(id: usize) -> Result<bool, Error> {
+    let config = CONFIG.read().await;
     //https://tidal.com/browse/album/86697999
     let album = get_album(id).await.unwrap();
     let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
     let tracks = get_items::<ItemResponseItem<Track>>(&url).await?;
-    for track in tracks {
-        download_track(track.item.id).await?;
-    }
+
+    stream::iter(tracks)
+        .map(|track| tokio::task::spawn(download_track(track.item.id)))
+        .buffer_unordered(config.concurrency)
+        .for_each(|r| async {
+            match r {
+                Ok(_) => {}
+                Err(_e) => panic!("download failed"),
+            }
+        })
+        .await;
 
     Ok(true)
 }
-pub async fn download_artist(id: i64) -> Result<bool, Error> {
+pub async fn download_artist(id: usize) -> Result<bool, Error> {
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
     let albums = get_items::<Album>(&url).await?;
     debug!("Got Albums successfully");

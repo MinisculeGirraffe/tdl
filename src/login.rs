@@ -1,5 +1,6 @@
 use crate::config::CONFIG;
 use anyhow::Error;
+use log::info;
 
 use crate::client;
 use tokio::time::Instant;
@@ -62,7 +63,7 @@ async fn login_config() -> Result<bool, Error> {
         config.login_key.access_token = Some(refresh.access_token);
         config.login_key.refresh_token = Some(refresh.refresh_token);
         config.save()?;
-        println!("Access Token Refreshed with Refresh Token");
+        info!("Access Token Refreshed with Refresh Token");
         return Ok(true);
     }
 

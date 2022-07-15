@@ -5,16 +5,16 @@ use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Artist {
-    pub id: i64,
+    pub id: usize,
     pub name: String,
     #[serde(alias = "type")]
     pub artist_type: String,
-    pub picture: String,
+    pub picture: Option<String>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Album {
-    pub id: i64,
+    pub id: usize,
     pub title: String,
     pub duration: Option<i64>,
     pub number_of_tracks: Option<i64>,
@@ -36,12 +36,12 @@ pub struct Album {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Track {
-    pub id: i64,
+    pub id: usize,
     pub title: String,
-    pub duration: i64,
-    pub track_number: i64,
-    pub volume_number: i64,
-    pub track_number_on_playlist: Option<i64>,
+    pub duration: usize,
+    pub track_number: usize,
+    pub volume_number: usize,
+    pub track_number_on_playlist: Option<usize>,
     pub isrc: String,
     pub explicit: bool,
     pub audio_quality: AudioQuality,
@@ -58,6 +58,27 @@ pub struct Track {
 pub struct TrackMix {
     master_track_mix: Option<String>,
     track_mix: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all(deserialize = "camelCase"))]
+pub struct Playlist {
+    uuid: String,
+    title: String,
+    number_of_tracks: usize,
+    number_of_videos: usize,
+    creator: PlaylistCreator,
+    description: String,
+    duration: usize,
+    promoted_artists: Vec<Artist>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlaylistCreator {
+    id: usize,
+    name: String,
+    #[serde(alias = "type")]
+    creator_type: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

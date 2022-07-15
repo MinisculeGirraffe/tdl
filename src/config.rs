@@ -14,6 +14,7 @@ pub struct Settings {
     pub download_path: String,
     pub audio_quality: AudioQuality,
     pub show_progress: bool,
+    pub concurrency: usize,
     pub download_cover: bool,
     pub login_key: LoginKey,
     pub api_key: ApiKey,
@@ -62,6 +63,7 @@ pub fn get_config() -> Result<Settings, Error> {
         .set_default("login_key.device_code", "")?
         .set_default("login_key.country_code", "")?
         .set_default("download_cover", true)?
+        .set_default("concurrency", 1)?
         .set_default("login_key.access_token", "")?
         .set_default("login_key.refresh_token", "")?
         .set_default("login_key.expires_after", 0)?
