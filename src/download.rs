@@ -38,8 +38,18 @@ async fn _remove_encryption(
 }
 
 pub async fn download_track(id: usize) -> Result<bool, Error> {
+    let pb = ProgressBar::new(0);
+    pb.set_style(ProgressStyle::default_bar()
+    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+    .progress_chars("#>-"));
+
     let config = CONFIG.read().await;
     let track = get_track(id).await?;
+    pb.set_message(format!(
+        "Downloading {} - {}",
+        track.artist.name, track.title
+    ));
+
     let path_str = get_path(&track).await?;
 
     if config.download_cover {
@@ -48,7 +58,11 @@ pub async fn download_track(id: usize) -> Result<bool, Error> {
 
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
-        info!("File already downloaded");
+        pb.finish_with_message(format!(
+            "File Already Exists | {} | Elapsed: {:.2?}",
+            &path_str,
+            pb.elapsed()
+        ));
         return Ok(false);
     }
     let stream = client::get_stream_url(track.id).await?;
@@ -60,14 +74,8 @@ pub async fn download_track(id: usize) -> Result<bool, Error> {
         .ok_or(anyhow!("Failed to get content length from {}", dl_url))?
         .try_into()?;
 
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-    .progress_chars("#>-"));
-    pb.set_message(format!(
-        "Downloading {} - {}",
-        track.artist.name, track.title
-    ));
+    pb.set_length(total_size);
+
     debug!("Creating File path {}", &dl_path.display());
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
     let mut file = File::create(dl_path).await?;
@@ -77,7 +85,14 @@ pub async fn download_track(id: usize) -> Result<bool, Error> {
         let chunk = item?;
         file.write_all(&chunk).await?;
         downloaded = min(downloaded + (chunk.len() as u64), total_size);
+        pb.set_position(downloaded)
     }
+    pb.finish_with_message(format!(
+        "Download Complete | {} - {} | Elapsed: {:.2?}",
+        track.artist.name,
+        track.title,
+        pb.elapsed()
+    ));
     get_meta(track, dl_path).await?;
     Ok(true)
 }
