@@ -40,14 +40,14 @@ async fn _remove_encryption(
 pub async fn download_track(id: usize) -> Result<bool, Error> {
     let pb = ProgressBar::new(0);
     pb.set_style(ProgressStyle::default_bar()
-    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})")
     .progress_chars("#>-"));
 
     let config = CONFIG.read().await;
     let track = get_track(id).await?;
     pb.set_message(format!(
-        "Downloading {} - {}",
-        track.artist.name, track.title
+        "Downloading File | [{}] {} - {}",
+        track.track_number, track.artist.name, track.title
     ));
 
     let path_str = get_path(&track).await?;
@@ -88,7 +88,8 @@ pub async fn download_track(id: usize) -> Result<bool, Error> {
         pb.set_position(downloaded)
     }
     pb.finish_with_message(format!(
-        "Download Complete | {} - {} | Elapsed: {:.2?}",
+        "Download Complete | [{}] {} - {} | Elapsed: {:.2?}",
+        track.track_number,
         track.artist.name,
         track.title,
         pb.elapsed()
