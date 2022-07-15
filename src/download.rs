@@ -10,6 +10,7 @@ use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
 use regex::{Captures, Regex};
+use sanitize_filename::sanitize;
 use std::cmp::min;
 use std::path::Path;
 use tokio::fs::File;
@@ -109,23 +110,31 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     let config = &CONFIG.read().await;
     let dl_path = &config.download_path;
     let shell_path = shellexpand::full(&dl_path)?;
-    let regex_raw = r"(\{artist\}|\{artist_id\}|\{album\}|\{album_id\}|\{track_num\}|\{track_name\}|\{quality\})";
-    let re = Regex::new(regex_raw).unwrap();
+    let album_re = r"\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}";
+    let artist_re = r"\{artist\}|\{artist_id\}";
+    let track_re = r"\{track_num\}|\{track_name\}|\{quality\}";
+    let master_re = format!("({}|{}|{})", artist_re, album_re, track_re);
+    let re = Regex::new(&master_re).unwrap();
+
+    let album = get_album(track.album.id).await?;
     let track_num_str = &track.track_number.to_string();
     let track_quality = &track.audio_quality.to_string();
     let track_id = &track.id.to_string();
     let artist_id = &track.artist.id.to_string();
     let album_id = &track.album.id.to_string();
-
+    let release = album.release_date.unwrap();
+    let ymd: Vec<&str> = release.splitn(3, '-').collect();
     let replaced = re.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
-        "{artist}" => sanitize_filename::sanitize(&track.artist.name),
-        "{artist_id}" => sanitize_filename::sanitize(artist_id),
-        "{album}" => sanitize_filename::sanitize(&track.album.title),
-        "{album_id}" => sanitize_filename::sanitize(album_id),
-        "{track_num}" => sanitize_filename::sanitize(track_num_str),
-        "{track_name}" => sanitize_filename::sanitize(&track.title),
-        "{track_id}" => sanitize_filename::sanitize(track_id),
-        "{quality}" => sanitize_filename::sanitize(track_quality),
+        "{artist}" => sanitize(&track.artist.name),
+        "{artist_id}" => sanitize(artist_id),
+        "{album}" => sanitize(&track.album.title),
+        "{album_id}" => sanitize(album_id),
+        "{track_num}" => sanitize(track_num_str),
+        "{track_name}" => sanitize(&track.title),
+        "{track_id}" => sanitize(track_id),
+        "{quality}" => sanitize(track_quality),
+        "{album_release}" => sanitize(&release),
+        "{album_release_year}" => sanitize(ymd[0]),
         _ => panic!("matched no tokens on download_path string"),
     });
 
