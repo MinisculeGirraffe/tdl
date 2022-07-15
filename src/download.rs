@@ -1,11 +1,6 @@
 use crate::client::{get_album, get_cover_data, get_items, get_track, ItemResponseItem};
 use crate::models::Album;
-use crate::{
-    client,
-    config::CONFIG,
-    decryption::{decrypt_file, decrypt_security_token},
-    models::{PlaybackManifest, Track},
-};
+use crate::{client, config::CONFIG, models::Track};
 use anyhow::anyhow;
 use anyhow::Error;
 use futures::stream;
@@ -19,23 +14,6 @@ use std::cmp::min;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-
-async fn _remove_encryption(
-    stream: PlaybackManifest,
-    src: Vec<u8>,
-    dst: &Path,
-) -> Result<(), Error> {
-    tokio::fs::create_dir_all(dst.parent().unwrap()).await?;
-    if stream.key_id.is_some() {
-        let (key, nonce) = decrypt_security_token(&stream.key_id.unwrap())?;
-        let res = decrypt_file(src, key, nonce).await.unwrap();
-        tokio::fs::write(dst, res).await?;
-        return Ok(());
-    }
-    debug!("No encryption key. Writing {} bytes directly", src.len());
-    tokio::fs::write(dst, src).await?;
-    Ok(())
-}
 
 pub async fn download_track(id: usize) -> Result<bool, Error> {
     let pb = ProgressBar::new(0);
@@ -71,8 +49,7 @@ pub async fn download_track(id: usize) -> Result<bool, Error> {
 
     let total_size: u64 = response
         .content_length()
-        .ok_or(anyhow!("Failed to get content length from {}", dl_url))?
-        .try_into()?;
+        .ok_or_else(|| anyhow!("Failed to get content length from {}", dl_url))?;
 
     pb.set_length(total_size);
 

@@ -2,7 +2,6 @@ extern crate crypto;
 
 mod client;
 mod config;
-mod decryption;
 mod download;
 mod login;
 mod models;
