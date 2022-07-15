@@ -9,7 +9,7 @@ pub struct Artist {
     pub name: String,
     #[serde(alias = "type")]
     pub artist_type: String,
-    pub picture: String,
+    pub picture: Option<String>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(deserialize = "camelCase"))]
@@ -70,7 +70,7 @@ pub struct Playlist {
     creator: PlaylistCreator,
     description: String,
     duration: usize,
-    promoted_artists: Vec<Artist>
+    promoted_artists: Vec<Artist>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -78,7 +78,7 @@ pub struct PlaylistCreator {
     id: usize,
     name: String,
     #[serde(alias = "type")]
-    creator_type: Option<String>
+    creator_type: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
