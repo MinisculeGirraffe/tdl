@@ -55,8 +55,10 @@ Example Values:
 ### audio_quality
 
 - `audio_quality` 
-  - expects one of the following values ordered in descending quality:
-
+  - Quality of downloaded tracks
+  - Default:
+    - `HI_RES`
+  - Accepted Values:
     - `HI_RES` 
       - (24bit/96kHz MQA encoded FLAC)
     - `LOSSLESS` 
@@ -65,6 +67,16 @@ Example Values:
       - (320kbps AAC)
     - `LOW` 
       - (96kbps AAC)
+
+### Concurrency
+
+- `concurrency`
+    - Number of concurrent downloads. Not recommended to set higher than 8.
+    - Default:
+        - `3`
+    - Accepted Values:
+        - `1`..`255`
+
 
 ### download_cover
 
@@ -76,9 +88,8 @@ Example Values:
   - `true`
   - `false`
 
-
-
 ### Progress
+
 - `show_progress`
   - Displays a progress bar when downloading files
   - Default: 
@@ -90,6 +101,6 @@ Example Values:
 - `progress_refresh_rate` 
   - Refresh rate in hz of the progress bar, if show_progress is set to true. Reduce this for lower CPU usage. 
   - Default:
-    -  5
+    -  `5`
   - Accepted values: 
     - `0`..`255`
