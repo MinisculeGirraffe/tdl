@@ -2,16 +2,18 @@
 
 Tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
+tdl offers significant performance improvements over the original python script by utilizing async and green threads for downloading files.
 
-Time Comparisons
-tidal-dl -l https://tidal.com/browse/album/53172142  16.12s user 6.16s system 45% cpu 48.954 total
-./tdl --url https://tidal.com/browse/album/53172142  0.74s user 0.77s system 16% cpu 9.343 total
+Time Comparisons:
 
+`tdl --url https://tidal.com/browse/album/197298621 --concurrent 3`
+ 1.94s user 3.24s system 31% cpu 16.291 total
 
-/tdl --url https://tidal.com/browse/album/192059802  3.04s user 2.76s system 18% cpu 31.713 total
-Configs are stored in `~/.config/tidal-dl/config.toml`
+`tidal-dl -l https://tidal.com/browse/album/197298621`
+ 12.96s user 5.38s system 35% cpu 51.731 total
+
 ## Config Setup
-
+Configs are stored in `~/.config/tidal-dl/config.toml`
 `download_path` will expand env variables along with shell accelerators such at `~`. In addition to specify the format to save tracks in, you can use the following tokens
 - Artist: 
 `{artist}`
