@@ -1,6 +1,6 @@
 # tdl
 
-Tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
+tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
 tdl offers significant performance improvements over the original python script by utilizing async and green threads for downloading files.
 
