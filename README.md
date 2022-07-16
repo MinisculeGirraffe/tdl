@@ -5,16 +5,24 @@ Tdl is a rust implementation of the python script [Tidal-Media-Downloader](https
 tdl offers significant performance improvements over the original python script by utilizing async and green threads for downloading files.
 
 Time Comparisons:
+ 
+| command | total | user | system |
+| ------- | ----- | ---- | ------ |
+| tdl concurrency 5 | 12.857 | 1.75s | 2.80s |
+| tdl concurrency 3 | 16.291s | 3.24s | 1.94s |
+| tdl concurrency 1 | 30.902s | 1.76s | 2.82s |
+| tidal-dl | 51.731 | 12.960s | 5.38s |
 
-`tdl --url https://tidal.com/browse/album/197298621 --concurrent 3`
- 1.94s user 3.24s system 31% cpu 16.291 total
-
-`tidal-dl -l https://tidal.com/browse/album/197298621`
- 12.96s user 5.38s system 35% cpu 51.731 total
 
 ## Config Setup
+
 Configs are stored in `~/.config/tidal-dl/config.toml`
-`download_path` will expand env variables along with shell accelerators such at `~`. In addition to specify the format to save tracks in, you can use the following tokens
+
+### download_path
+`download_path` will expand env variables along with shell accelerators such at `~`.
+
+In addition to specify the format to save tracks in, you can use the following tokens:
+
 - Artist: 
 `{artist}`
 `{artist_id}`
@@ -33,6 +41,7 @@ Example Values:
 
 - `$MUSIC_DIR/{artist} - [{artist_id}]/{album}/{track_name}`
 
+### audio_quality
 
 `audio_quality` expects one of the following values ordered in descending quality:
 - `HI_RES` (24bit/96kHz MQA encoded FLAC)
@@ -40,5 +49,6 @@ Example Values:
 - `HIGH` (320kbps AAC)
 - `LOW` (96kbps AAC)
 
+### download_cover
 
 `download_cover` Download a cover.jpg in an album folder
