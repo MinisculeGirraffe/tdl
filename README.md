@@ -19,40 +19,77 @@ Time Comparisons:
 Configs are stored in `~/.config/tidal-dl/config.toml`
 
 ### download_path
-`download_path` will expand env variables along with shell accelerators such at `~`.
+
+`download_path` will expand env variables along with shell accelerators such as `~`.
 
 In addition to specify the format to save tracks in, you can use the following tokens:
 
 - Artist: 
-`{artist}`
-`{artist_id}`
+  - `{artist}`
+    - Artist Name
+  - `{artist_id}`
+    - Unique ID from the Tidal API
 - Album: 
-`{album}`
-`{album_id}`
+  - `{album}`
+    - Album Title
+  - `{album_id}`
+    - Unique ID from the Tidal API: 
+  - `{album_release}`
+    - Full YYYY-MM-DD of relase
+  - `{album_release_year}`
+    - YYYY date of album release
 
 - Track:
-`{track_num}`
-`{track_name}`
-`{track_id}`
-`{quality}`
+  - `{track_num}`
+  - `{track_name}`
+  - `{track_id}`
+  - `{quality}`
+    -  String literal of audio_quality
 
 Example Values: 
-- `$HOME/Music/{artist}/{album}/{track_num} - {track_name}[{track_id}]`
+
+- `$HOME/Music/{artist}/{album} [{album_id}] [{album_release_year}]/{track_num} - {track_name}`
 
 - `$MUSIC_DIR/{artist} - [{artist_id}]/{album}/{track_name}`
 
 ### audio_quality
 
-`audio_quality` expects one of the following values ordered in descending quality:
-- `HI_RES` (24bit/96kHz MQA encoded FLAC)
-- `LOSSLESS` (1411kbps|16bit/44.1kHz FLAC/ALAC)
-- `HIGH` (320kbps AAC)
-- `LOW` (96kbps AAC)
+- `audio_quality` 
+  - expects one of the following values ordered in descending quality:
+
+    - `HI_RES` 
+      - (24bit/96kHz MQA encoded FLAC)
+    - `LOSSLESS` 
+      - (1411kbps|16bit/44.1kHz FLAC/ALAC)
+    - `HIGH` 
+      - (320kbps AAC)
+    - `LOW` 
+      - (96kbps AAC)
 
 ### download_cover
 
-`download_cover` Download a cover.jpg in an album folder
+- `download_cover` 
+  - Download a cover.jpg in an album folder
+  - Default: 
+    - `true`
+  - Accepted Values: 
+  - `true`
+  - `false`
+
+
 
 ### Progress
-`show_progress` true false - Displays a progress bar when downloading files
-`progress_refresh_rate` 0-255 Refresh rate in hz of the progress bar, if show_progress is set to true. Reduce this for lower CPU usage. 
+- `show_progress`
+  - Displays a progress bar when downloading files
+  - Default: 
+    - `true`
+  - Accepted Values: 
+  - `true`
+  - `false`
+
+- `progress_refresh_rate` 
+  - Refresh rate in hz of the progress bar, if show_progress is set to true. Reduce this for lower CPU usage. 
+  - Default:
+    -  5
+  - Accepted values: 
+    - `0`..`255`
