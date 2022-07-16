@@ -24,7 +24,7 @@ async fn main() {
         .author("Daniel Norred")
         .about("Command Line Tidal Song Downloader")
         .arg(arg!(--url <VALUE>).help("Tidal URL to Song/Album/Artist"))
-        .arg(arg!(--concurrent <VALUE>).required(false))
+        .arg(arg!(--concurrent <VALUE>).required(false).help("Number of songs to download concurrently"))
         .get_matches();
 
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
