@@ -9,6 +9,7 @@ use std::fmt;
 
 use std::str::FromStr;
 
+use crate::config::CONFIG;
 use crate::login::*;
 use anyhow::Error;
 use clap::{arg, Command};
@@ -23,6 +24,11 @@ async fn main() {
         .author("Daniel Norred")
         .about("Command Line Tidal Song Downloader")
         .arg(arg!(--url <VALUE>).help("Tidal URL to Song/Album/Artist"))
+        .arg(
+            arg!(--concurrent <VALUE>)
+                .required(false)
+                .help("Number of songs to download concurrently"),
+        )
         .get_matches();
 
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -33,6 +39,12 @@ async fn main() {
     };
     let url = matches.get_one::<String>("url").expect("required");
     let action = Action::from_str(url).expect("invalid URL supplied");
+    let concurrent = matches.get_one::<String>("concurrent");
+    if let Some(val) = concurrent {
+        println!("Got value");
+        CONFIG.write().await.concurrency = usize::from_str(val).unwrap();
+    }
+
     dispatch_action(action).await.unwrap();
 }
 #[derive(Debug)]
@@ -85,7 +97,7 @@ async fn dispatch_action(action: Action) -> Result<bool, Error> {
     // let url = format!("https://api.tidal.com/v1/{}/{}",action.kind.to_string(),action.id);
 
     match action.kind {
-        ActionKind::Track => download_track(action.id).await,
+        ActionKind::Track => download_track(action.id, None).await,
         ActionKind::Album => download_album(action.id).await,
         ActionKind::Artist => download_artist(action.id).await,
     }

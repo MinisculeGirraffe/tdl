@@ -1,18 +1,28 @@
 # tdl
 
-Tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
+tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
+
+tdl offers significant performance improvements over the original python script by utilizing async and green threads for downloading files.
+
+Time Comparisons:
+ 
+| command | total | user | system |
+| ------- | ----- | ---- | ------ |
+| tdl concurrency 5 | 12.857 | 1.75s | 2.80s |
+| tdl concurrency 3 | 16.291s | 3.24s | 1.94s |
+| tdl concurrency 1 | 30.902s | 1.76s | 2.82s |
+| tidal-dl | 51.731 | 12.960s | 5.38s |
 
 
-Time Comparisons
-tidal-dl -l https://tidal.com/browse/album/53172142  16.12s user 6.16s system 45% cpu 48.954 total
-./tdl --url https://tidal.com/browse/album/53172142  0.74s user 0.77s system 16% cpu 9.343 total
-
-
-/tdl --url https://tidal.com/browse/album/192059802  3.04s user 2.76s system 18% cpu 31.713 total
-Configs are stored in `~/.config/tidal-dl/config.toml`
 ## Config Setup
 
-`download_path` will expand env variables along with shell accelerators such at `~`. In addition to specify the format to save tracks in, you can use the following tokens
+Configs are stored in `~/.config/tidal-dl/config.toml`
+
+### download_path
+`download_path` will expand env variables along with shell accelerators such at `~`.
+
+In addition to specify the format to save tracks in, you can use the following tokens:
+
 - Artist: 
 `{artist}`
 `{artist_id}`
@@ -31,6 +41,7 @@ Example Values:
 
 - `$MUSIC_DIR/{artist} - [{artist_id}]/{album}/{track_name}`
 
+### audio_quality
 
 `audio_quality` expects one of the following values ordered in descending quality:
 - `HI_RES` (24bit/96kHz MQA encoded FLAC)
@@ -38,5 +49,6 @@ Example Values:
 - `HIGH` (320kbps AAC)
 - `LOW` (96kbps AAC)
 
+### download_cover
 
 `download_cover` Download a cover.jpg in an album folder
