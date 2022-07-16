@@ -224,14 +224,15 @@ pub struct ItemResponseItem<T> {
     #[serde(alias = "type")]
     pub item_type: String,
 }
-pub async fn get_items<'a, T>(url: &str) -> Result<Vec<T>, Error>
+pub async fn get_items<'a, T>(url: &str, opts: Option<Vec<(&str, String)>>) -> Result<Vec<T>, Error>
 where
     T: DeserializeOwned + 'a,
 {
     let config = CONFIG.read().await;
     let limit = 50;
     let mut offset = 0;
-    let params = &[
+
+    let mut params = vec![
         ("limit", limit.to_string()),
         ("offset", offset.to_string()),
         (
@@ -239,11 +240,15 @@ where
             config.login_key.country_code.as_ref().unwrap().to_owned(),
         ),
     ];
+    if let Some(opt) = opts {
+        params.extend(opt);
+    }
+
     let mut result: Vec<T> = Vec::new();
     loop {
         let body = reqwest::Client::new()
             .get(url)
-            .query(params)
+            .query(&params)
             .bearer_auth(config.login_key.access_token.as_ref().unwrap())
             .send()
             .await?

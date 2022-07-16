@@ -91,7 +91,7 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
     //https://tidal.com/browse/album/86697999
     let album = get_album(id).await.unwrap();
     let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
-    let tracks = get_items::<ItemResponseItem<Track>>(&url).await?;
+    let tracks = get_items::<ItemResponseItem<Track>>(&url, None).await?;
     let mp = MultiProgress::new();
     mp.set_draw_target(ProgressDrawTarget::stdout_with_hz(
         config.progress_refresh_rate,
@@ -110,8 +110,16 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
     Ok(true)
 }
 pub async fn download_artist(id: usize) -> Result<bool, Error> {
+    let config = CONFIG.read().await;
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
-    let albums = get_items::<Album>(&url).await?;
+    let mut albums = get_items::<Album>(&url, None).await?;
+
+    if config.include_singles {
+        let filter = vec![("filter", "EPSANDSINGLES".to_string())];
+        let mut singles = get_items::<Album>(&url, Some(filter)).await?;
+        albums.append(&mut singles);
+    }
+
     debug!("Got Albums successfully");
     for album in albums {
         download_album(album.id).await?;
