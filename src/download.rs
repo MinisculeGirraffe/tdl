@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use anyhow::Error;
 use futures::stream;
 use futures::StreamExt;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
@@ -17,47 +17,55 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool, Error> {
+    let config = CONFIG.read().await;
+
+    //Initialize Progress bar
     let pb: ProgressBar;
-
-    let mut multi_progress = false;
-
-    if let Some(mpb) = mp.as_ref() {
-        pb = mpb.add(ProgressBar::new(0));
-        multi_progress = true;
+    if config.show_progress {
+        if let Some(mpb) = mp.as_ref() {
+            pb = mpb.add(ProgressBar::new(0));
+        } else {
+            pb = ProgressBar::new(0);
+            pb.set_draw_target(ProgressDrawTarget::stdout_with_hz(
+                config.progress_refresh_rate,
+            ))
+        }
     } else {
         pb = ProgressBar::new(0);
+        pb.set_draw_target(ProgressDrawTarget::hidden())
     }
+    pb.set_style(ProgressStyle::default_bar().template("{msg}\n{spinner:.green}")?);
+    pb.set_message(format!("Getting Track Details | {}", id));
 
-    pb.set_style(ProgressStyle::default_bar()
-    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})")?
-    .progress_chars("#>-"));
-
-    let config = CONFIG.read().await;
     let track = get_track(id).await?;
-    pb.set_message(format!(
-        "Downloading File | [{}] {} - {}",
+
+    let track_info = format!(
+        "[{}] {} - {}",
         track.track_number, track.artist.name, track.title
-    ));
-
+    );
     let path_str = get_path(&track).await?;
-
     if config.download_cover {
         let _ = download_cover(&track).await;
     }
-
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
+        pb.println(format!("File Exists {}", track_info));
+        // Exit early if the file already exists
         return Ok(false);
     }
+
     let stream = client::get_stream_url(track.id).await?;
     let dl_url = &stream.urls[0];
-    let response = reqwest::Client::new().get(dl_url).send().await?;
-
+    let response = reqwest::get(dl_url).await?;
     let total_size: u64 = response
         .content_length()
         .ok_or_else(|| anyhow!("Failed to get content length from {}", dl_url))?;
 
     pb.set_length(total_size);
+    pb.set_style(ProgressStyle::default_bar()
+                .template("{msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})")?
+                .progress_chars("#>-"));
+    pb.set_message(format!("Downloading File | {}", track_info));
 
     debug!("Creating File path {}", &dl_path.display());
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
@@ -67,24 +75,14 @@ pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool
     while let Some(item) = stream.next().await {
         let chunk = item?;
         file.write_all(&chunk).await?;
+
         downloaded = min(downloaded + (chunk.len() as u64), total_size);
         pb.set_position(downloaded)
     }
 
-    let finish_text = format!(
-        "Download Complete | [{}] {} - {} | Elapsed: {:.2?}",
-        track.track_number,
-        track.artist.name,
-        track.title,
-        pb.elapsed()
-    );
-    if multi_progress {
-        mp.unwrap().println(finish_text)?;
-    } else {
-        pb.finish_with_message(finish_text);
-    }
-
+    pb.set_message(format!("Writing Metadata | {}", track_info));
     get_meta(track, dl_path).await?;
+    pb.println(format!("Download Complete | {}", track_info));
     Ok(true)
 }
 
@@ -95,6 +93,9 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
     let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
     let tracks = get_items::<ItemResponseItem<Track>>(&url).await?;
     let mp = MultiProgress::new();
+    mp.set_draw_target(ProgressDrawTarget::stdout_with_hz(
+        config.progress_refresh_rate,
+    ));
     stream::iter(tracks)
         .map(|track| tokio::task::spawn(download_track(track.item.id, Some(mp.clone()))))
         .buffer_unordered(config.concurrency)

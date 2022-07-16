@@ -14,6 +14,7 @@ pub struct Settings {
     pub download_path: String,
     pub audio_quality: AudioQuality,
     pub show_progress: bool,
+    pub progress_refresh_rate: u8,
     pub concurrency: usize,
     pub download_cover: bool,
     pub login_key: LoginKey,
@@ -58,8 +59,9 @@ pub fn get_config() -> Result<Settings, Error> {
             "download_path",
             "$HOME/Music/{artist}/{album}/{track_num} - {track_name}",
         )?
-        .set_default("audio_quality", "LOSSLESS")?
-        .set_default("show_progress", false)?
+        .set_default("audio_quality", "HI_RES")?
+        .set_default("show_progress", true)?
+        .set_default("progress_refresh_rate", 5)?
         .set_default("login_key.device_code", "")?
         .set_default("login_key.country_code", "")?
         .set_default("download_cover", true)?

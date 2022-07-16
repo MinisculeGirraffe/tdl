@@ -52,3 +52,7 @@ Example Values:
 ### download_cover
 
 `download_cover` Download a cover.jpg in an album folder
+
+### Progress
+`show_progress` true false - Displays a progress bar when downloading files
+`progress_refresh_rate` 0-255 Refresh rate in hz of the progress bar, if show_progress is set to true. Reduce this for lower CPU usage. 

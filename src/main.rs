@@ -31,7 +31,7 @@ async fn main() {
         )
         .get_matches();
 
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("none")).init();
 
     match login().await {
         Ok(res) => info!("Logged in: {}", res),
