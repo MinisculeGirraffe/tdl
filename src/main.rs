@@ -1,5 +1,3 @@
-extern crate crypto;
-
 mod client;
 mod config;
 mod download;
