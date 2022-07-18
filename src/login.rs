@@ -33,6 +33,7 @@ async fn login_web() -> Result<bool, Error> {
             continue;
         }
         task.abort();
+        term.show_cursor()?;
         let timestamp = chrono::Utc::now().timestamp();
         let mut config = CONFIG.write().await;
         let login_results = login?;
@@ -46,6 +47,7 @@ async fn login_web() -> Result<bool, Error> {
         return Ok(true);
     }
     task.abort();
+    term.show_cursor()?;
     println!("Login Request timed out. Please generate a new code");
     Ok(false)
 }
@@ -84,7 +86,6 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
         let term = Term::stdout();
         term.hide_cursor().ok();
         let mut interval = interval(Duration::from_millis(83));
-        let ansi_link = r"\e]8;;";
         let url = format!("https://{}", code.verification_uri_complete);
         let hyperlink = format!("\x1b]8;;{}\x1b\\{}\x1b]8;;\x1b", url, url);
         let login_str = format!(
