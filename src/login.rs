@@ -22,7 +22,7 @@ pub async fn login() -> Result<bool, Error> {
 
 async fn login_web() -> Result<bool, Error> {
     let code = client::get_device_code().await?;
-
+    let term = Term::stdout();
     let now = Instant::now();
     let task = display_login_prompt(code.clone(), now);
 
@@ -84,8 +84,13 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
         let term = Term::stdout();
         term.hide_cursor().ok();
         let mut interval = interval(Duration::from_millis(83));
+        let ansi_link = r"\e]8;;";
         let url = format!("https://{}", code.verification_uri_complete);
-        let login_str = format!("Please Login to Tidal: {}", style(url).underlined().bold());
+        let hyperlink = format!("\x1b]8;;{}\x1b\\{}\x1b]8;;\x1b", url, url);
+        let login_str = format!(
+            "Please Login to Tidal: {}",
+            style(hyperlink).underlined().bold()
+        );
         let login_str_width = measure_text_width(&login_str);
         term.write_line(&login_str).ok();
         loop {
@@ -102,7 +107,7 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
                 time_str =
                     pad_str(&time_str, term_width, console::Alignment::Right, None).to_string();
             }
-            term.clear_line();
+            term.clear_line().ok();
             term.write_str(&time_str).ok();
             animation_index += 1;
             if animation_index > clocks.len() - 1 {
