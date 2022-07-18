@@ -3,24 +3,28 @@ mod config;
 mod download;
 mod login;
 mod models;
-use std::fmt;
-
-use std::str::FromStr;
 
 use crate::config::CONFIG;
 use crate::login::*;
 use anyhow::Error;
 use clap::{arg, Command};
 use download::{download_album, download_artist, download_track};
-use env_logger::Env;
 use log::info;
+use std::env;
+use std::fmt;
+use std::str::FromStr;
 
 #[tokio::main]
 async fn main() {
-    let matches = Command::new("tdl")
-        .version("0.1")
-        .author("Daniel Norred")
-        .about("Command Line Tidal Song Downloader")
+    {
+        // read from config to always trigger initialization.
+        CONFIG.read().await;
+    }
+
+    let matches = Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(arg!(--url <VALUE>).help("Tidal URL to Song/Album/Artist"))
         .arg(
             arg!(--concurrent <VALUE>)
@@ -29,7 +33,7 @@ async fn main() {
         )
         .get_matches();
 
-    env_logger::Builder::from_env(Env::default().default_filter_or("none")).init();
+    //env_logger::Builder::from_env(Env::default().default_filter_or("none")).init();
 
     match login().await {
         Ok(res) => info!("Logged in: {}", res),
@@ -92,8 +96,6 @@ impl fmt::Display for ActionKind {
 }
 
 async fn dispatch_action(action: Action) -> Result<bool, Error> {
-    // let url = format!("https://api.tidal.com/v1/{}/{}",action.kind.to_string(),action.id);
-
     match action.kind {
         ActionKind::Track => download_track(action.id, None).await,
         ActionKind::Album => download_album(action.id).await,

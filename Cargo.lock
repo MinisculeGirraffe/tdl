@@ -1380,6 +1380,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "console",
  "env_logger",
  "futures",
  "indicatif",
