@@ -23,15 +23,15 @@ pub struct UserResponse {
     pub country_code: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct DeviceAuthResponse {
     pub device_code: String,
     pub user_code: String,
     pub verification_uri: String,
     pub verification_uri_complete: String,
-    pub expires_in: i64,
-    pub interval: i64,
+    pub expires_in: u64,
+    pub interval: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

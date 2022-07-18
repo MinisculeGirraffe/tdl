@@ -1,5 +1,6 @@
 [package]
 name = "tdl"
+description = "A command line tool for downloading files from the Tidal API"
 version = "0.1.2"
 edition = "2021"
 
@@ -26,6 +27,8 @@ env_logger = "0.9.0"
 sanitize-filename = "0.4.0"
 futures = "0.3.21"
 indicatif = "0.17.0-rc.11"
+console = "0.15.0"
+
 [dependencies.serde_with]
 version = "1.14.0"
 features = [ "chrono" ]
