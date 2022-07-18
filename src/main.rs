@@ -17,6 +17,11 @@ use log::info;
 
 #[tokio::main]
 async fn main() {
+    {
+        // read from config to always trigger initialization.
+        CONFIG.read().await;
+    }
+    
     let matches = Command::new("tdl")
         .version("0.1")
         .author("Daniel Norred")

@@ -58,7 +58,7 @@ pub fn get_config() -> Result<Settings, Error> {
     let config = Config::builder()
         .set_default(
             "download_path",
-            "$HOME/Music/{artist}/{album}/{track_num} - {track_name}",
+            "$HOME/Music/{artist}/{album} [{album_id}] [{album_release_year}]/{track_num} - {track_name}",
         )?
         .set_default("audio_quality", "HI_RES")?
         .set_default("show_progress", true)?
@@ -67,7 +67,7 @@ pub fn get_config() -> Result<Settings, Error> {
         .set_default("login_key.device_code", "")?
         .set_default("login_key.country_code", "")?
         .set_default("download_cover", true)?
-        .set_default("concurrency", 1)?
+        .set_default("concurrency", 3)?
         .set_default("login_key.access_token", "")?
         .set_default("login_key.refresh_token", "")?
         .set_default("login_key.expires_after", 0)?
@@ -87,7 +87,7 @@ pub fn get_config() -> Result<Settings, Error> {
 fn get_config_dir() -> String {
     let config_dir =
         var("XDG_CONFIG_HOME").unwrap_or_else(|_| var("HOME").unwrap_or_else(|_| "".to_string()));
-    format!("{}/.config/tidal-dl", config_dir)
+    format!("{}/.config/tdl", config_dir)
 }
 
 fn get_config_file() -> String {
