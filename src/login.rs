@@ -43,7 +43,6 @@ async fn login_web() -> Result<bool, Error> {
         config.login_key.user_id = Some(login_results.user.user_id);
         config.login_key.country_code = Some(login_results.user.country_code);
         config.save()?;
-
         return Ok(true);
     }
     task.abort();
@@ -84,7 +83,7 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
         let mut animation_index = 0;
         let term = Term::stdout();
         term.hide_cursor().ok();
-        let mut interval = interval(Duration::from_millis(100));
+        let mut interval = interval(Duration::from_millis(83));
         let url = format!("https://{}", code.verification_uri_complete);
         let login_str = format!("Please Login to Tidal: {}", style(url).underlined().bold());
         let login_str_width = measure_text_width(&login_str);
