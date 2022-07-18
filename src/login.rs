@@ -87,7 +87,7 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
         let url = format!("https://{}", code.verification_uri_complete);
         let login_str = format!("Please Login to Tidal: {}", style(url).underlined().bold());
         let login_str_width = measure_text_width(&login_str);
-        term.write_line(&login_str);
+        term.write_line(&login_str).ok();
         loop {
             interval.tick().await;
             let timeleft = code.expires_in - instant.elapsed().as_secs();
