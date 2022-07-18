@@ -5,7 +5,7 @@ use log::info;
 use tokio::task::JoinHandle;
 
 use crate::client::{self, DeviceAuthResponse};
-use console::{measure_text_width, Term};
+use console::{measure_text_width, Emoji, Term};
 use console::{pad_str, style};
 use tokio::time::{interval, sleep, Duration, Instant};
 pub async fn login() -> Result<bool, Error> {
@@ -78,7 +78,7 @@ async fn login_config() -> Result<bool, Error> {
 fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandle<()> {
     tokio::task::spawn(async move {
         let clocks = vec![
-            '🕛', '🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚',
+            "🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚",
         ];
         let mut animation_index = 0;
         let term = Term::stdout();
@@ -87,23 +87,23 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
         let url = format!("https://{}", code.verification_uri_complete);
         let login_str = format!("Please Login to Tidal: {}", style(url).underlined().bold());
         let login_str_width = measure_text_width(&login_str);
+        term.write_line(&login_str);
         loop {
             interval.tick().await;
             let timeleft = code.expires_in - instant.elapsed().as_secs();
-            let mut time_str = format!("{} {}s ", clocks[animation_index], timeleft);
+            let mut time_str = format!(
+                "{} {}:{} ",
+                Emoji(clocks[animation_index], ""),
+                (timeleft / 60) % 60,
+                timeleft % 60,
+            );
             let term_width: usize = term.width().into();
             if term_width > login_str_width {
-                time_str = pad_str(
-                    &time_str,
-                    term_width - login_str_width,
-                    console::Alignment::Right,
-                    None,
-                )
-                .to_string();
+                time_str =
+                    pad_str(&time_str, term_width, console::Alignment::Right, None).to_string();
             }
-            let out_str = format!("{}{}", login_str, time_str);
-            term.clear_line().ok();
-            term.write_str(&out_str).ok();
+            term.clear_line();
+            term.write_str(&time_str).ok();
             animation_index += 1;
             if animation_index > clocks.len() - 1 {
                 animation_index = 0
