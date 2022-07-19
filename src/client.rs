@@ -4,8 +4,13 @@ use crate::{
 };
 use anyhow::Error;
 use log::{debug, info};
+use reqwest::Client;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
+
+lazy_static::lazy_static! {
+    pub static ref CLIENT: Client  = reqwest::Client::new();
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshResponse {
@@ -75,8 +80,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
         ..Default::default()
     };
     let body = serde_urlencoded::to_string(&data)?;
-
-    let req = reqwest::Client::new()
+    let req = CLIENT
         .post(format!("{}/device_authorization", &AUTH_BASE))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
@@ -93,7 +97,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
 }
 
 pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
-    let req = reqwest::Client::new()
+    let req = CLIENT
         .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
         .send()
@@ -102,7 +106,7 @@ pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
 }
 
 pub async fn _login_access_token(access_token: &str, user_id: Option<&str>) -> Result<(), Error> {
-    let req = reqwest::Client::new()
+    let req = CLIENT
         .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
         .send()
@@ -141,7 +145,7 @@ pub async fn refresh_access_token(refresh_token: &str) -> Result<RefreshResponse
     };
     let body = serde_urlencoded::to_string(&data)?;
 
-    let req = reqwest::Client::new()
+    let req = CLIENT
         .post("https://auth.tidal.com/v1/oauth2/token")
         .body(body)
         .basic_auth(client_id, Some(client_secret))
@@ -169,7 +173,7 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
         ..Default::default()
     };
     let body = serde_urlencoded::to_string(&data)?;
-    let req = reqwest::Client::new()
+    let req = CLIENT
         .post(format!("{}/token", &AUTH_BASE))
         .basic_auth(client_id, Some(client_secret))
         .body(body)
@@ -195,7 +199,7 @@ pub async fn get_track(id: usize) -> Result<Track, Error> {
     let token = config.login_key.access_token.as_ref().unwrap();
     let url = format!("{}/tracks/{}", API_BASE, id);
 
-    let res = reqwest::Client::new()
+    let res = CLIENT
         .get(url)
         .bearer_auth(token)
         .query(&[(
@@ -246,7 +250,7 @@ where
 
     let mut result: Vec<T> = Vec::new();
     loop {
-        let body = reqwest::Client::new()
+        let body = CLIENT
             .get(url)
             .query(&params)
             .bearer_auth(config.login_key.access_token.as_ref().unwrap())
@@ -277,7 +281,7 @@ pub async fn get_album(id: usize) -> Result<Album, Error> {
     let country_code = config.login_key.country_code.as_ref().unwrap();
     let url = format!("{}/albums/{}", API_BASE, id);
 
-    let res = reqwest::Client::new()
+    let res = CLIENT
         .get(url)
         .bearer_auth(token)
         .query(&[("countryCode", country_code)])
@@ -311,7 +315,7 @@ pub async fn get_stream_url(id: usize) -> Result<PlaybackManifest, Error> {
         ("playbackmode", &PlaybackMode::Stream.to_string()),
         ("assetpresentation", &AssetPresentation::Full.to_string()),
     ];
-    let req = reqwest::Client::new()
+    let req = CLIENT
         .get(url)
         .query(query)
         .bearer_auth(config.login_key.access_token.as_ref().unwrap())
