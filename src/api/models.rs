@@ -1,7 +1,6 @@
-
 use serde::{Deserialize, Serialize};
-use std::{fmt, str::FromStr};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
+use std::{fmt, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshResponse {
