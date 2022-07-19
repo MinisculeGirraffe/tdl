@@ -13,6 +13,19 @@ Time Comparisons:
 | tdl concurrency 1 | 30.902s | 1.76s | 2.82s |
 | tidal-dl | 51.731 | 12.960s | 5.38s |
 
+## Usage
+
+Get a single item
+```
+tdl get <URL>
+tdl get https://tidal.com/browse/album/129835816
+```
+
+Get multiple items
+```
+tdl get <URL1> <URL2> 
+tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/147102710  
+```
 
 ## Config Setup
 

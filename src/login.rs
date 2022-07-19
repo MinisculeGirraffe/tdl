@@ -1,14 +1,12 @@
 use crate::config::CONFIG;
 use anyhow::Error;
 use indicatif::TermLike;
-use log::info;
 use tokio::task::JoinHandle;
 
 use crate::client::{self, DeviceAuthResponse};
 use console::{measure_text_width, Emoji, Term};
 use console::{pad_str, style};
 use tokio::time::{interval, sleep, Duration, Instant};
-
 
 pub async fn login_web() -> Result<bool, Error> {
     let code = client::get_device_code().await?;
@@ -58,7 +56,7 @@ pub async fn login_config() -> Result<bool, Error> {
         config.login_key.access_token = Some(refresh.access_token);
         config.login_key.refresh_token = Some(refresh.refresh_token);
         config.save()?;
-        info!("Access Token Refreshed with Refresh Token");
+        println!("Access Token Refreshed with Refresh Token");
         return Ok(true);
     }
 

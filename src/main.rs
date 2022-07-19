@@ -60,12 +60,12 @@ fn cli() -> Command<'static> {
 async fn get(matches: &ArgMatches) {
     login().await;
     if let Some(concurrent) = matches.get_one::<String>("concurrent") {
-        CONFIG.write().await.concurrency = usize::from_str(&concurrent).unwrap();
+        CONFIG.write().await.concurrency = usize::from_str(concurrent).unwrap();
     }
 
     if let Some(urls) = matches.get_many::<String>("URL") {
         for url in urls {
-            let action = Action::from_str(&url).expect("invalid URL supplied");
+            let action = Action::from_str(url).expect("invalid URL supplied");
             let _ = match action.kind {
                 ActionKind::Track => download_track(action.id, None).await,
                 ActionKind::Album => download_album(action.id).await,
