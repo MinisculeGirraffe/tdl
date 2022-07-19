@@ -374,7 +374,7 @@ async fn get_auth_token() -> Result<String, Error> {
         .login_key
         .access_token
         .clone()
-        .ok_or(Error::msg("Missing Auth Token"))
+        .ok_or_else(|| Error::msg("Missing Auth Token"))
 }
 
 async fn get_country_code() -> Result<String, Error> {
@@ -383,5 +383,5 @@ async fn get_country_code() -> Result<String, Error> {
         .login_key
         .country_code
         .clone()
-        .ok_or(Error::msg("Missing Auth Token"))
+        .ok_or_else(|| Error::msg("Missing Auth Token"))
 }
