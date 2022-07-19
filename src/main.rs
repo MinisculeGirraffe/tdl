@@ -8,47 +8,85 @@ use crate::config::CONFIG;
 use crate::login::*;
 use anyhow::Error;
 use clap::{arg, Command};
+use clap::{value_parser, ArgMatches};
 use download::{download_album, download_artist, download_track};
-use log::info;
+
 use std::env;
 use std::fmt;
 use std::str::FromStr;
 
 #[tokio::main]
 async fn main() {
+    // read from config to always trigger initialization, then release lock
     {
-        // read from config to always trigger initialization.
         CONFIG.read().await;
     }
 
-    let matches = Command::new(env!("CARGO_PKG_NAME"))
+    let matches = cli().get_matches();
+    match matches.subcommand() {
+        Some(("get", get_matches)) => get(get_matches).await,
+        Some(("login", _login_matches)) => login().await,
+        _ => unreachable!(), // If all subcommands are defined above, anything else is unreachabe!()
+    };
+}
+
+fn cli() -> Command<'static> {
+    Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
-        .arg(arg!(--url <VALUE>).help("Tidal URL to Song/Album/Artist"))
-        .arg(
-            arg!(--concurrent <VALUE>)
-                .required(false)
-                .help("Number of songs to download concurrently"),
+        .subcommand_required(true)
+        .subcommand(
+            Command::new("get")
+                .arg(
+                    arg!(<URL>)
+                        .multiple_values(true)
+                        .required(true)
+                        .value_parser(value_parser!(String))
+                        .help("The Tidal URL to download")
+                        .use_value_delimiter(true)
+                        .min_values(1),
+                )
+                .arg(
+                    arg!(--concurrent <VALUE>)
+                        .short('c')
+                        .required(false)
+                        .help("Number of songs to download concurrently"),
+                ),
         )
-        .get_matches();
+        .subcommand(Command::new("login"))
+}
 
-    //env_logger::Builder::from_env(Env::default().default_filter_or("none")).init();
-
-    match login().await {
-        Ok(res) => info!("Logged in: {}", res),
-        Err(e) => eprintln!("{}", e),
-    };
-    let url = matches.get_one::<String>("url").expect("required");
-    let action = Action::from_str(url).expect("invalid URL supplied");
-    let concurrent = matches.get_one::<String>("concurrent");
-    if let Some(val) = concurrent {
-        println!("Got value");
-        CONFIG.write().await.concurrency = usize::from_str(val).unwrap();
+async fn get(matches: &ArgMatches) {
+    login().await;
+    if let Some(concurrent) = matches.get_one::<String>("concurrent") {
+        CONFIG.write().await.concurrency = usize::from_str(&concurrent).unwrap();
     }
 
-    dispatch_action(action).await.unwrap();
+    if let Some(urls) = matches.get_many::<String>("URL") {
+        for url in urls {
+            let action = Action::from_str(&url).expect("invalid URL supplied");
+            let _ = match action.kind {
+                ActionKind::Track => download_track(action.id, None).await,
+                ActionKind::Album => download_album(action.id).await,
+                ActionKind::Artist => download_artist(action.id).await,
+            };
+        }
+    }
 }
+
+pub async fn login() {
+    let cfg_login = login_config().await;
+    if cfg_login.is_ok() {
+        return;
+    }
+    let web_login = login_web().await;
+    if web_login.is_ok() {
+        return;
+    }
+    panic!("All Login methods failed")
+}
+
 #[derive(Debug)]
 struct Action {
     kind: ActionKind,
@@ -92,13 +130,5 @@ impl fmt::Display for ActionKind {
         };
         fmt.write_str(str)?;
         Ok(())
-    }
-}
-
-async fn dispatch_action(action: Action) -> Result<bool, Error> {
-    match action.kind {
-        ActionKind::Track => download_track(action.id, None).await,
-        ActionKind::Album => download_album(action.id).await,
-        ActionKind::Artist => download_artist(action.id).await,
     }
 }
