@@ -195,23 +195,34 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
         }
     }
     let res = req.json::<RefreshResponse>().await?;
-    info!("Got refresh response: {:?}", res);
-
     Ok(res)
 }
 
+pub async fn logout() -> Result<(), Error> {
+    let token = get_auth_token().await?;
+    let _ = CLIENT
+        .post("https://api.tidal.com/v1/logout")
+        .bearer_auth(token)
+        .send()
+        .await?;
+
+    {
+        let mut config = CONFIG.write().await;
+        config.login_key.access_token = None;
+        config.login_key.refresh_token = None;
+        config.save()?;
+    }
+    Ok(())
+}
+
 pub async fn get_track(id: usize) -> Result<Track, Error> {
-    let config = CONFIG.read().await;
-    let token = config.login_key.access_token.as_ref().unwrap();
+    let (token, country_code) = get_api_param().await?;
     let url = format!("{}/tracks/{}", API_BASE, id);
 
     let res = CLIENT
         .get(url)
         .bearer_auth(token)
-        .query(&[(
-            "countryCode",
-            config.login_key.country_code.as_ref().unwrap(),
-        )])
+        .query(&[("countryCode", country_code)])
         .send()
         .await?
         .json::<Track>()
@@ -238,17 +249,14 @@ pub async fn get_items<'a, T>(url: &str, opts: Option<Vec<(&str, String)>>) -> R
 where
     T: DeserializeOwned + 'a,
 {
-    let config = CONFIG.read().await;
+    let (token, country_code) = get_api_param().await?;
     let limit = 50;
     let mut offset = 0;
 
     let mut params = vec![
         ("limit", limit.to_string()),
         ("offset", offset.to_string()),
-        (
-            "countryCode",
-            config.login_key.country_code.as_ref().unwrap().to_owned(),
-        ),
+        ("countryCode", country_code),
     ];
     if let Some(opt) = opts {
         params.extend(opt);
@@ -259,7 +267,7 @@ where
         let body = CLIENT
             .get(url)
             .query(&params)
-            .bearer_auth(config.login_key.access_token.as_ref().unwrap())
+            .bearer_auth(&token)
             .send()
             .await?
             .text()
@@ -273,18 +281,16 @@ where
         for item in json.items {
             result.push(item);
         }
-        if length < 50 {
+        if length < limit {
             break;
         }
-        offset += 50;
+        offset += limit;
     }
     Ok(result)
 }
 
 pub async fn get_album(id: usize) -> Result<Album, Error> {
-    let config = CONFIG.read().await;
-    let token = config.login_key.access_token.as_ref().unwrap();
-    let country_code = config.login_key.country_code.as_ref().unwrap();
+    let (token, country_code) = get_api_param().await?;
     let url = format!("{}/albums/{}", API_BASE, id);
 
     let res = CLIENT
@@ -310,13 +316,10 @@ struct PlaybackInfoPostPaywallRes {
 
 pub async fn get_stream_url(id: usize) -> Result<PlaybackManifest, Error> {
     let config = CONFIG.read().await;
-
+    let (token, country_code) = get_api_param().await?;
     let url = format!("{}/tracks/{}/playbackinfopostpaywall", &API_BASE, id);
     let query = &[
-        (
-            "countryCode",
-            config.login_key.country_code.as_ref().unwrap(),
-        ),
+        ("countryCode", &country_code),
         ("audioquality", &config.audio_quality.to_string()),
         ("playbackmode", &PlaybackMode::Stream.to_string()),
         ("assetpresentation", &AssetPresentation::Full.to_string()),
@@ -324,7 +327,7 @@ pub async fn get_stream_url(id: usize) -> Result<PlaybackManifest, Error> {
     let req = CLIENT
         .get(url)
         .query(query)
-        .bearer_auth(config.login_key.access_token.as_ref().unwrap())
+        .bearer_auth(token)
         .send()
         .await?
         .json::<PlaybackInfoPostPaywallRes>()
@@ -359,4 +362,26 @@ pub async fn get_cover_data(id: &str) -> Result<Cover, Error> {
     let data = req.bytes().await?.to_vec();
 
     Ok(Cover { content_type, data })
+}
+
+async fn get_api_param() -> Result<(String, String), Error> {
+    Ok((get_auth_token().await?, get_country_code().await?))
+}
+
+async fn get_auth_token() -> Result<String, Error> {
+    let config = CONFIG.read().await;
+    config
+        .login_key
+        .access_token
+        .clone()
+        .ok_or(Error::msg("Missing Auth Token"))
+}
+
+async fn get_country_code() -> Result<String, Error> {
+    let config = CONFIG.read().await;
+    config
+        .login_key
+        .country_code
+        .clone()
+        .ok_or(Error::msg("Missing Auth Token"))
 }

@@ -9,6 +9,7 @@ use crate::login::*;
 use anyhow::Error;
 use clap::{arg, Command};
 use clap::{value_parser, ArgMatches};
+use client::logout;
 use download::{download_album, download_artist, download_track};
 
 use std::env;
@@ -25,9 +26,10 @@ async fn main() {
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("get", get_matches)) => get(get_matches).await,
-        Some(("login", _login_matches)) => login().await,
+        Some(("login", _)) => login().await,
+        Some(("logout", _)) => logout().await.unwrap(),
         _ => unreachable!(), // If all subcommands are defined above, anything else is unreachabe!()
-    };
+    }
 }
 
 fn cli() -> Command<'static> {
@@ -54,6 +56,7 @@ fn cli() -> Command<'static> {
                 ),
         )
         .subcommand(Command::new("login"))
+        .subcommand(Command::new("logout"))
 }
 
 async fn get(matches: &ArgMatches) {
