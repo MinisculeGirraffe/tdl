@@ -9,7 +9,13 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
 lazy_static::lazy_static! {
-    pub static ref CLIENT: Client  = reqwest::Client::new();
+    pub static ref CLIENT: Client  = reqwest::Client::builder()
+    //don't use the system openssl
+    .use_rustls_tls()
+    //use the example chrome useragent from MDN Docs as tidal API's will sometimes fail without it
+    .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59")
+    .build()
+    .unwrap();
 }
 
 #[derive(Serialize, Deserialize, Debug)]
