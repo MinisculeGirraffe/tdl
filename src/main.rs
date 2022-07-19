@@ -42,10 +42,9 @@ fn cli() -> Command<'static> {
                     arg!(<URL>)
                         .multiple_values(true)
                         .required(true)
+                        .min_values(1)
                         .value_parser(value_parser!(String))
-                        .help("The Tidal URL to download")
-                        .use_value_delimiter(true)
-                        .min_values(1),
+                        .help("The Tidal URL to download"),
                 )
                 .arg(
                     arg!(--concurrent <VALUE>)
