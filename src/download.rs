@@ -1,6 +1,6 @@
-use crate::client::{get_album, get_cover_data, get_items, get_track, ItemResponseItem};
-use crate::models::Album;
-use crate::{client, config::CONFIG, models::Track};
+use crate::api::media::{get_album, get_cover_data, get_items, get_stream_url, get_track};
+use crate::api::models::*;
+use crate::config::CONFIG;
 use anyhow::anyhow;
 use anyhow::Error;
 use futures::stream;
@@ -54,7 +54,7 @@ pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool
         return Ok(false);
     }
 
-    let stream = client::get_stream_url(track.id).await?;
+    let stream = get_stream_url(track.id).await?;
     let dl_url = &stream.urls[0];
     let response = reqwest::get(dl_url).await?;
     let total_size: u64 = response

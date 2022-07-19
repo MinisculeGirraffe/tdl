@@ -1,21 +1,24 @@
+use crate::api::auth::{
+    check_auth_status, get_device_code, refresh_access_token, verify_access_token,
+};
+use crate::api::models::DeviceAuthResponse;
 use crate::config::CONFIG;
 use anyhow::Error;
 use indicatif::TermLike;
 use tokio::task::JoinHandle;
 
-use crate::client::{self, DeviceAuthResponse};
 use console::{measure_text_width, Emoji, Term};
 use console::{pad_str, style};
 use tokio::time::{interval, sleep, Duration, Instant};
 
 pub async fn login_web() -> Result<bool, Error> {
-    let code = client::get_device_code().await?;
+    let code = get_device_code().await?;
     let term = Term::stdout();
     let now = Instant::now();
     let task = display_login_prompt(code.clone(), now);
 
     while now.elapsed().as_secs() <= code.expires_in {
-        let login = client::check_auth_status(&code.device_code).await;
+        let login = check_auth_status(&code.device_code).await;
         if login.is_err() {
             sleep(Duration::from_secs(code.interval)).await;
             continue;
@@ -43,14 +46,14 @@ pub async fn login_web() -> Result<bool, Error> {
 pub async fn login_config() -> Result<bool, Error> {
     let mut config = CONFIG.write().await;
     if let Some(access_token) = config.login_key.access_token.as_ref() {
-        if client::verify_access_token(access_token).await? {
+        if verify_access_token(access_token).await? {
             println!("Access Token Valid");
             return Ok(true);
         }
     }
 
     if let Some(refresh_token) = config.login_key.refresh_token.as_ref() {
-        let refresh = client::refresh_access_token(refresh_token).await?;
+        let refresh = refresh_access_token(refresh_token).await?;
         let now = chrono::Utc::now().timestamp();
         config.login_key.expires_after = Some(refresh.expires_in + now);
         config.login_key.access_token = Some(refresh.access_token);

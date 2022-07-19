@@ -1,3 +1,4 @@
+use crate::api::models::AudioQuality;
 use anyhow::Error;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
@@ -6,8 +7,6 @@ use serde_with::NoneAsEmptyString;
 use std::env::var;
 use std::io::Write;
 use tokio::sync::RwLock;
-
-use crate::models::AudioQuality;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
