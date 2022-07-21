@@ -1,4 +1,5 @@
-use crate::api::media::{get_album, get_cover_data, get_items, get_stream_url, get_track};
+use crate::api::get_items;
+use crate::api::media::{get_album, get_cover_data, get_stream_url, get_track};
 use crate::api::models::*;
 use crate::config::CONFIG;
 use anyhow::anyhow;
@@ -6,6 +7,7 @@ use anyhow::Error;
 use futures::stream;
 use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
+use lazy_static::lazy_static;
 use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
@@ -91,7 +93,7 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
     //https://tidal.com/browse/album/86697999
     let album = get_album(id).await.unwrap();
     let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
-    let tracks = get_items::<ItemResponseItem<Track>>(&url, None).await?;
+    let tracks = get_items::<ItemResponseItem<Track>>(&url, None, None).await?;
     let mp = MultiProgress::new();
     mp.set_draw_target(ProgressDrawTarget::stdout_with_hz(
         config.progress_refresh_rate,
@@ -112,11 +114,11 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
 pub async fn download_artist(id: usize) -> Result<bool, Error> {
     let config = CONFIG.read().await;
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
-    let mut albums = get_items::<Album>(&url, None).await?;
+    let mut albums = get_items::<Album>(&url, None, None).await?;
 
     if config.include_singles {
-        let filter = vec![("filter", "EPSANDSINGLES".to_string())];
-        let mut singles = get_items::<Album>(&url, Some(filter)).await?;
+        let filter = vec![("filter".to_string(), "EPSANDSINGLES".to_string())];
+        let mut singles = get_items::<Album>(&url, Some(filter), None).await?;
         albums.append(&mut singles);
     }
 
@@ -127,15 +129,14 @@ pub async fn download_artist(id: usize) -> Result<bool, Error> {
     Ok(true)
 }
 
+lazy_static! {
+    pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\})").unwrap();
+}
+
 async fn get_path(track: &Track) -> Result<String, Error> {
     let config = &CONFIG.read().await;
     let dl_path = &config.download_path;
     let shell_path = shellexpand::full(&dl_path)?;
-    let album_re = r"\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}";
-    let artist_re = r"\{artist\}|\{artist_id\}";
-    let track_re = r"\{track_num\}|\{track_name\}|\{quality\}";
-    let master_re = format!("({}|{}|{})", artist_re, album_re, track_re);
-    let re = Regex::new(&master_re).unwrap();
 
     let album = get_album(track.album.id).await?;
     let track_num_str = &track.track_number.to_string();
@@ -145,7 +146,7 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     let album_id = &track.album.id.to_string();
     let release = album.release_date.unwrap();
     let ymd: Vec<&str> = release.splitn(3, '-').collect();
-    let replaced = re.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
+    let replaced = RE.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
         "{artist}" => sanitize(&track.artist.name),
         "{artist_id}" => sanitize(artist_id),
         "{album}" => sanitize(&track.album.title),
