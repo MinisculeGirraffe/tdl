@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 use std::{fmt, str::FromStr};
+use tabled::Tabled;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshResponse {
@@ -62,7 +63,7 @@ impl Default for DeviceAuthRequest {
 pub struct ItemResponse<T> {
     pub limit: usize,
     pub offset: usize,
-    pub total_number_of_items: usize,
+    pub total_number_of_items: u32,
     pub items: Vec<T>,
 }
 
@@ -87,55 +88,117 @@ pub struct Cover {
     pub content_type: String,
     pub data: Vec<u8>,
 }
-#[derive(Serialize, Deserialize, Debug)]
+
+trait Named {
+    fn get_name(&self) -> &str;
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
 pub struct Artist {
     pub id: usize,
     pub name: String,
     #[serde(alias = "type")]
-    pub artist_type: String,
+    #[tabled(skip)]
+    pub artist_type: Option<String>,
+    #[tabled(skip)]
+    pub artist_types: Option<Vec<String>>, //todo change to enum
+    #[tabled(skip)]
     pub picture: Option<String>,
+    #[tabled(display_with = "display_option")]
+    pub popularity: Option<i32>,
+    #[tabled(skip)]
+    pub artist_roles: Option<Vec<ArtistRole>>,
 }
-#[derive(Serialize, Deserialize, Debug)]
+impl Named for Artist {
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Album {
     pub id: usize,
     pub title: String,
+    #[tabled(display_with = "display_option")]
     pub duration: Option<i64>,
+    #[tabled(display_with = "display_option")]
     pub number_of_tracks: Option<i64>,
+    #[tabled(skip)]
     pub number_of_videos: Option<i64>,
+    #[tabled(skip)]
     pub number_of_volumes: Option<i64>,
+    #[tabled(display_with = "display_option")]
     pub release_date: Option<String>,
     #[serde(alias = "type")]
+    #[tabled(skip)]
     pub album_type: Option<String>,
+    #[tabled(skip)]
     pub version: Option<String>,
+    #[tabled(skip)]
     pub cover: String,
+    #[tabled(skip)]
     pub video_cover: Option<String>,
+    #[tabled(display_with = "display_option")]
     pub explicit: Option<bool>,
+    #[tabled(display_with = "display_option")]
     pub audio_quality: Option<AudioQuality>,
+    #[tabled(skip)]
     pub audio_modes: Option<Vec<AudioMode>>,
+    #[tabled(display_with = "display_option_named")]
     pub artist: Option<Artist>,
+    #[tabled(skip)]
     pub artists: Option<Vec<Artist>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+impl Named for Album {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Track {
+    #[tabled(order = 0)]
     pub id: usize,
+    #[tabled(order = 1)]
     pub title: String,
     pub duration: usize,
+    #[tabled(skip)]
     pub track_number: usize,
+    #[tabled(skip)]
     pub volume_number: usize,
+    #[tabled(skip)]
     pub track_number_on_playlist: Option<usize>,
+    #[tabled(skip)]
     pub isrc: String,
+    #[tabled(order = 4)]
     pub explicit: bool,
+    #[tabled(order = 5)]
     pub audio_quality: AudioQuality,
+    #[tabled(skip)]
     pub copyright: String,
+    #[tabled(order = 3)]
+    #[tabled(display_with = "display_name")]
     pub artist: Artist,
+    #[tabled(skip)]
     pub artists: Vec<Artist>,
+    #[tabled(order = 2)]
+    #[tabled(display_with = "display_name")]
     pub album: Album,
+    #[tabled(skip)]
     pub allow_streaming: bool,
+    #[tabled(skip)]
     pub playlist: Option<String>,
+    #[tabled(skip)]
     pub mixes: TrackMix,
+}
+
+impl Named for Track {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
 }
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(deserialize = "UPPERCASE"))]
@@ -155,6 +218,11 @@ pub struct Playlist {
     description: String,
     duration: usize,
     promoted_artists: Vec<Artist>,
+}
+impl Named for Playlist {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -335,4 +403,45 @@ impl FromStr for EncryptionType {
             _ => Err("Error".to_string()),
         }
     }
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+#[serde(rename_all(deserialize = "PascalCase"))]
+pub enum ArtistType {
+    Artist,
+    Contributor,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ArtistRole {
+    pub category_id: i32,
+    pub category: ArtistRoleCategory,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+#[serde(rename_all(deserialize = "PascalCase"))]
+pub enum ArtistRoleCategory {
+    Artist,
+    Performer,
+    Producer,
+    Songwriter,
+    Engineer,
+    Misc,
+}
+
+fn display_option(o: &Option<impl ToString>) -> String {
+    match o {
+        Some(val) => val.to_string(),
+        None => String::new(),
+    }
+}
+
+fn display_option_named(o: &Option<impl Named>) -> String {
+    match o {
+        Some(n) => n.get_name().to_string(),
+        None => String::new(),
+    }
+}
+
+fn display_name(n: &impl Named) -> String {
+    n.get_name().to_string()
 }
