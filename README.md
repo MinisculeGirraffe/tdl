@@ -12,7 +12,7 @@ Time Comparisons:
 | tdl concurrency 5 | 6.447s | 0.63s | 1.10s | 509% |
 | tdl concurrency 3 | 6.965 |  0.60s | 1.05s | 471% |
 | tdl concurrency 1 | 14.001 | 0.76s | 1.46s | 234% |
-| tidal-dl | 32.827s | 5.54s  | 2.53s | | 
+| tidal-dl | 32.827s | 5.54s  | 2.53s | 100% | 
 
 ## Usage
 
