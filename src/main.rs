@@ -57,8 +57,8 @@ async fn search(matches: &ArgMatches) {
         let result = match matches.get_one::<String>("filter") {
             Some(filter) => match filter.as_str() {
                 "artist" => search_content::<Artist>("artists", query, max).await,
-                "track" => search_content::<Track>("artists", query, max).await,
-                "album" => search_content::<Album>("artists", query, max).await,
+                "track" => search_content::<Track>("tracks", query, max).await,
+                "album" => search_content::<Album>("albums", query, max).await,
                 _ => unreachable!(),
             },
             None => todo!(), //search all

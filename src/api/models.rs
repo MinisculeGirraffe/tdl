@@ -119,7 +119,8 @@ impl Named for Artist {
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Album {
     pub id: usize,
-    pub title: String,
+    #[tabled(display_with = "display_option")]
+    pub title: Option<String>,
     #[tabled(display_with = "display_option")]
     pub duration: Option<i64>,
     #[tabled(display_with = "display_option")]
@@ -136,7 +137,7 @@ pub struct Album {
     #[tabled(skip)]
     pub version: Option<String>,
     #[tabled(skip)]
-    pub cover: String,
+    pub cover: Option<String>,
     #[tabled(skip)]
     pub video_cover: Option<String>,
     #[tabled(display_with = "display_option")]
@@ -153,7 +154,10 @@ pub struct Album {
 
 impl Named for Album {
     fn get_name(&self) -> &str {
-        &self.title
+        match &self.title {
+            Some(t) => t.as_str(),
+            None => "",
+        }
     }
 }
 

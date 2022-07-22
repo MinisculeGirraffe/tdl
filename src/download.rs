@@ -139,6 +139,7 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     let shell_path = shellexpand::full(&dl_path)?;
 
     let album = get_album(track.album.id).await?;
+    let album_name = album.title.unwrap();
     let track_num_str = &track.track_number.to_string();
     let track_quality = &track.audio_quality.to_string();
     let track_id = &track.id.to_string();
@@ -149,7 +150,7 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     let replaced = RE.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
         "{artist}" => sanitize(&track.artist.name),
         "{artist_id}" => sanitize(artist_id),
-        "{album}" => sanitize(&track.album.title),
+        "{album}" => sanitize(&album_name),
         "{album_id}" => sanitize(album_id),
         "{track_num}" => sanitize(track_num_str),
         "{track_name}" => sanitize(&track.title),
@@ -170,11 +171,14 @@ async fn get_meta(track: Track, path: &Path) -> Result<(), Error> {
     tag.set_vorbis("TITLE", vec![track.title]);
     tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
     tag.set_vorbis("ARTIST", vec![track.artist.name]);
-    tag.set_vorbis("ALBUM", vec![track.album.title]);
+    tag.set_vorbis("ALBUM", vec![track.album.title.unwrap_or(String::new())]);
     tag.set_vorbis("COPYRIGHT", vec![track.copyright]);
     tag.set_vorbis("ISRC", vec![track.isrc]);
-    let cover = get_cover_data(&track.album.cover).await?;
-    tag.add_picture(cover.content_type, CoverFront, cover.data);
+    if let Some(cover) = &track.album.cover {
+        let cover = get_cover_data(cover).await?;
+        tag.add_picture(cover.content_type, CoverFront, cover.data);
+    }
+
     tag.save()?;
     info!("Metadata written to file");
     Ok(())
@@ -186,8 +190,13 @@ pub async fn download_cover(track: &Track) -> Result<(), Error> {
     if dl_path.exists() {
         return Ok(());
     }
-    let cover = get_cover_data(&track.album.cover).await?;
-    tokio::fs::write(dl_path, cover.data).await?;
+    let cover = &track
+        .album
+        .cover
+        .as_ref()
+        .ok_or_else(|| Error::msg("No Cover available for Album"))?;
+    let pic = get_cover_data(&cover).await?;
+    tokio::fs::write(dl_path, pic.data).await?;
     info!("Write cover to disk");
     Ok(())
 }
