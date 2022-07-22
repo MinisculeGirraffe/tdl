@@ -4,17 +4,17 @@ mod config;
 mod download;
 mod login;
 mod models;
+use crate::config::CONFIG;
 use crate::login::*;
-use crate::{api::search::search_track, config::CONFIG};
-use api::search::search_album;
-use api::{auth::logout, search::search_artist};
+use api::auth::logout;
+use api::models::{Album, Artist, Track};
+use api::search::search_content;
 use clap::ArgMatches;
 use cli::cli;
 use download::{download_album, download_artist, download_track};
-//use env_logger::Env;
+use env_logger::Env;
 use models::{Action, ActionKind};
 use std::str::FromStr;
-use tabled::TableIteratorExt;
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +22,7 @@ async fn main() {
     {
         CONFIG.read().await;
     }
-    // env_logger::Builder::from_env(Env::default().default_filter_or("none")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("none")).init();
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("get", get_matches)) => get(get_matches).await,
@@ -53,18 +53,20 @@ async fn get(matches: &ArgMatches) {
 
 async fn search(matches: &ArgMatches) {
     if let Some(query) = matches.get_one::<String>("query") {
-        let q = query.to_string();
         let max = matches.get_one::<u32>("max").cloned();
-        let table = match matches.get_one::<String>("filter") {
+        let result = match matches.get_one::<String>("filter") {
             Some(filter) => match filter.as_str() {
-                "artist" => search_artist(q, max).await.unwrap().table(),
-                "track" => search_track(q, max).await.unwrap().table(),
-                "album" => search_album(q, max).await.unwrap().table(),
+                "artist" => search_content::<Artist>("artists", query, max).await,
+                "track" => search_content::<Track>("artists", query, max).await,
+                "album" => search_content::<Album>("artists", query, max).await,
                 _ => unreachable!(),
             },
             None => todo!(), //search all
         };
-        println!("{}", table)
+        match result {
+            Ok(t) => println!("{t}"),
+            Err(e) => eprintln!("{e}"),
+        }
     }
 }
 
