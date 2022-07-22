@@ -30,7 +30,7 @@ tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/
 
 ## Config Setup
 
-Configs are stored in `~/.config/tidal-dl/config.toml`
+Configs are stored in `~/.config/tdl/config.toml`
 
 ### download_path
 
