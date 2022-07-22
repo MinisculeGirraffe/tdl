@@ -121,9 +121,9 @@ pub struct Album {
     pub id: usize,
     #[tabled(display_with = "display_option")]
     pub title: Option<String>,
-    #[tabled(display_with = "display_option")]
+    #[tabled(skip)]
     pub duration: Option<i64>,
-    #[tabled(display_with = "display_option")]
+    #[tabled(skip)]
     pub number_of_tracks: Option<i64>,
     #[tabled(skip)]
     pub number_of_videos: Option<i64>,
