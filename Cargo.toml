@@ -28,7 +28,7 @@ sanitize-filename = "0.4.0"
 futures = "0.3.21"
 indicatif = "0.17.0-rc.11"
 console = "0.15.0"
-tabled = "0.7.0"
+tabled = "0.8.0"
 
 [dependencies.serde_with]
 version = "1.14.0"

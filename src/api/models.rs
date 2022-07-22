@@ -164,9 +164,7 @@ impl Named for Album {
 #[derive(Serialize, Deserialize, Debug, Tabled)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Track {
-    #[tabled(order = 0)]
     pub id: usize,
-    #[tabled(order = 1)]
     pub title: String,
     pub duration: usize,
     #[tabled(skip)]
@@ -177,18 +175,14 @@ pub struct Track {
     pub track_number_on_playlist: Option<usize>,
     #[tabled(skip)]
     pub isrc: String,
-    #[tabled(order = 4)]
     pub explicit: bool,
-    #[tabled(order = 5)]
     pub audio_quality: AudioQuality,
     #[tabled(skip)]
     pub copyright: String,
-    #[tabled(order = 3)]
     #[tabled(display_with = "display_name")]
     pub artist: Artist,
     #[tabled(skip)]
     pub artists: Vec<Artist>,
-    #[tabled(order = 2)]
     #[tabled(display_with = "display_name")]
     pub album: Album,
     #[tabled(skip)]
