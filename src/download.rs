@@ -171,7 +171,7 @@ async fn get_meta(track: Track, path: &Path) -> Result<(), Error> {
     tag.set_vorbis("TITLE", vec![track.title]);
     tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
     tag.set_vorbis("ARTIST", vec![track.artist.name]);
-    tag.set_vorbis("ALBUM", vec![track.album.title.unwrap_or(String::new())]);
+    tag.set_vorbis("ALBUM", vec![track.album.title.unwrap_or_default()]);
     tag.set_vorbis("COPYRIGHT", vec![track.copyright]);
     tag.set_vorbis("ISRC", vec![track.isrc]);
     if let Some(cover) = &track.album.cover {
@@ -195,7 +195,7 @@ pub async fn download_cover(track: &Track) -> Result<(), Error> {
         .cover
         .as_ref()
         .ok_or_else(|| Error::msg("No Cover available for Album"))?;
-    let pic = get_cover_data(&cover).await?;
+    let pic = get_cover_data(cover).await?;
     tokio::fs::write(dl_path, pic.data).await?;
     info!("Write cover to disk");
     Ok(())

@@ -6,7 +6,6 @@ use super::get_items;
 use super::API_BASE;
 use tabled::TableIteratorExt;
 
-
 pub async fn search_content<'a, T>(url: &str, query: &str, max: Option<u32>) -> Result<Table, Error>
 where
     T: DeserializeOwned + 'a + Tabled,
