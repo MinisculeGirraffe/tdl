@@ -1,4 +1,8 @@
-use clap::{arg, value_parser, Arg, Command};
+use clap::{
+    arg,
+    builder::{NonEmptyStringValueParser, PossibleValuesParser, RangedU64ValueParser},
+    value_parser, Arg, Command,
+};
 
 pub fn cli() -> Command<'static> {
     Command::new(env!("CARGO_PKG_NAME"))
@@ -19,13 +23,14 @@ fn get() -> Command<'static> {
                 .multiple_values(true)
                 .required(true)
                 .min_values(1)
-                .value_parser(clap::builder::NonEmptyStringValueParser::new())
+                .value_parser(NonEmptyStringValueParser::new())
                 .help("The Tidal URL to download"),
         )
         .arg(
             arg!(--concurrent <VALUE>)
                 .short('c')
                 .required(false)
+                .value_parser(RangedU64ValueParser::<u8>::new().range(1..10))
                 .help("Number of songs to download concurrently"),
         )
 }
@@ -36,14 +41,14 @@ fn search() -> Command<'static> {
             Arg::new("query")
                 .takes_value(true)
                 .required(true)
-                .value_parser(clap::builder::NonEmptyStringValueParser::new())
+                .value_parser(NonEmptyStringValueParser::new())
                 .help("Term to search for"),
         )
         .arg(
             Arg::new("filter")
                 .long("filter")
                 .short('f')
-                .value_parser(clap::builder::PossibleValuesParser::new([
+                .value_parser(PossibleValuesParser::new([
                     "all", "artist", "album", "track", "playlist",
                 ]))
                 .takes_value(true)

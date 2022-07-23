@@ -89,7 +89,7 @@ Example Values:
     - Default:
         - `3`
     - Accepted Values:
-        - `1`..`255`
+        - `1`..`10`
 
 
 ### download_cover
@@ -117,4 +117,4 @@ Example Values:
   - Default:
     -  `5`
   - Accepted values: 
-    - `0`..`255`
+    - `1`..`255`

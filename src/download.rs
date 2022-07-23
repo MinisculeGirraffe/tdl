@@ -100,7 +100,7 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
     ));
     stream::iter(tracks)
         .map(|track| tokio::task::spawn(download_track(track.item.id, Some(mp.clone()))))
-        .buffer_unordered(config.concurrency)
+        .buffer_unordered(config.concurrency.into())
         .for_each(|r| async {
             match r {
                 Ok(_) => {}

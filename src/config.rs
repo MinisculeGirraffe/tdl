@@ -15,7 +15,7 @@ pub struct Settings {
     pub show_progress: bool,
     pub progress_refresh_rate: u8,
     pub include_singles: bool,
-    pub concurrency: usize,
+    pub concurrency: u8,
     pub download_cover: bool,
     pub login_key: LoginKey,
     pub api_key: ApiKey,

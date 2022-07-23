@@ -35,8 +35,8 @@ async fn main() {
 
 async fn get(matches: &ArgMatches) {
     login().await;
-    if let Some(concurrent) = matches.get_one::<String>("concurrent") {
-        CONFIG.write().await.concurrency = usize::from_str(concurrent).unwrap();
+    if let Some(concurrent) = matches.get_one::<u8>("concurrent") {
+        CONFIG.write().await.concurrency = *concurrent;
     }
 
     if let Some(urls) = matches.get_many::<String>("URL") {
