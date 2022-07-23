@@ -29,7 +29,7 @@ pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool
     let path_str = get_path(&track).await?;
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
-        pb.println(format!("File Exists"));
+        pb.println("File Exists");
         // Exit early if the file already exists
         return Ok(false);
     }
@@ -37,7 +37,7 @@ pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool
     if config.download_cover {
         //spawn a green thread as to not block the current download
         //failure doesn't really matter so result is unchecked
-        tokio::task::spawn(download_cover(track.clone().to_owned(),path_str.clone()));
+        tokio::task::spawn(download_cover(track.to_owned(), path_str.to_owned()));
     }
 
     let stream_url = &get_stream_url(track.id).await?.urls[0];

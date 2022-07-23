@@ -93,7 +93,7 @@ trait Named {
     fn get_name(&self) -> &str;
 }
 
-#[derive(Serialize, Deserialize, Debug,Clone, Tabled)]
+#[derive(Serialize, Deserialize, Debug, Clone, Tabled)]
 pub struct Artist {
     pub id: usize,
     pub name: String,
@@ -115,7 +115,7 @@ impl Named for Artist {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug,Clone, Tabled)]
+#[derive(Serialize, Deserialize, Debug, Clone, Tabled)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Album {
     pub id: usize,
@@ -161,7 +161,7 @@ impl Named for Album {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug,Clone, Tabled)]
+#[derive(Serialize, Deserialize, Debug, Clone, Tabled)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Track {
     pub id: usize,
@@ -198,7 +198,7 @@ impl Named for Track {
         &self.title
     }
 }
-#[derive(Serialize, Deserialize,Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all(deserialize = "UPPERCASE"))]
 pub struct TrackMix {
     master_track_mix: Option<String>,
@@ -259,7 +259,7 @@ impl FromStr for PlaybackManifest {
     }
 }
 
-#[derive(SerializeDisplay, DeserializeFromStr,Clone, Debug)]
+#[derive(SerializeDisplay, DeserializeFromStr, Clone, Debug)]
 ///LOW(96kbps AAC)
 ///HIGH(320kbps AAC)
 ///LOSSLESS(1411kbps|16bit/44.1kHz FLAC/ALAC)
@@ -295,7 +295,7 @@ impl FromStr for AudioQuality {
     }
 }
 
-#[derive(SerializeDisplay, DeserializeFromStr,Clone, Debug)]
+#[derive(SerializeDisplay, DeserializeFromStr, Clone, Debug)]
 pub enum AudioMode {
     Stereo,
     DolbyAtmos,
@@ -409,12 +409,12 @@ pub enum ArtistType {
     Artist,
     Contributor,
 }
-#[derive(Serialize, Deserialize,Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ArtistRole {
     pub category_id: i32,
     pub category: ArtistRoleCategory,
 }
-#[derive(Serialize, Deserialize,Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 #[serde(rename_all(deserialize = "PascalCase"))]
 pub enum ArtistRoleCategory {
