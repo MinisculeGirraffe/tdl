@@ -1,6 +1,6 @@
-use crate::api::get_items;
 use crate::api::media::{get_album, get_cover_data, get_stream_url, get_track};
 use crate::api::models::*;
+use crate::api::{get_items, REQ};
 use crate::config::CONFIG;
 use anyhow::anyhow;
 use anyhow::Error;
@@ -17,56 +17,39 @@ use std::cmp::min;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::try_join;
 
 pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool, Error> {
     let config = CONFIG.read().await;
-
-    //Initialize Progress bar
-    let pb: ProgressBar;
-    if config.show_progress {
-        if let Some(mpb) = mp.as_ref() {
-            pb = mpb.add(ProgressBar::new(0));
-        } else {
-            pb = ProgressBar::new(0);
-            pb.set_draw_target(ProgressDrawTarget::stdout_with_hz(
-                config.progress_refresh_rate,
-            ))
-        }
-    } else {
-        pb = ProgressBar::new(0);
-        pb.set_draw_target(ProgressDrawTarget::hidden())
-    }
-    pb.set_style(ProgressStyle::default_bar().template("{msg}\n{spinner:.green}")?);
-    pb.set_message(format!("Getting Track Details | {}", id));
-
-    let track = get_track(id).await?;
-
+    let (pb, track) = try_join!(setup_progress(mp, id), get_track(id))?;
     let track_info = format!(
         "[{}] {} - {}",
         track.track_number, track.artist.name, track.title
     );
     let path_str = get_path(&track).await?;
-    if config.download_cover {
-        let _ = download_cover(&track).await;
-    }
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
-        pb.println(format!("File Exists {}", track_info));
+        pb.println(format!("File Exists"));
         // Exit early if the file already exists
         return Ok(false);
     }
 
-    let stream = get_stream_url(track.id).await?;
-    let dl_url = &stream.urls[0];
-    let response = reqwest::get(dl_url).await?;
+    if config.download_cover {
+        //spawn a green thread as to not block the current download
+        //failure doesn't really matter so result is unchecked
+        tokio::task::spawn(download_cover(track.clone().to_owned(),path_str.clone()));
+    }
+
+    let stream_url = &get_stream_url(track.id).await?.urls[0];
+    let response = REQ.get(stream_url).send().await?;
     let total_size: u64 = response
         .content_length()
-        .ok_or_else(|| anyhow!("Failed to get content length from {}", dl_url))?;
+        .ok_or_else(|| anyhow!("Failed to get content length from {}", stream_url))?;
 
     pb.set_length(total_size);
     pb.set_style(ProgressStyle::default_bar()
-                .template("{msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})")?
-                .progress_chars("#>-"));
+                    .template("{msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})")?
+                    .progress_chars("#>-"));
     pb.set_message(format!("Downloading File | {}", track_info));
 
     debug!("Creating File path {}", &dl_path.display());
@@ -77,29 +60,30 @@ pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool
     while let Some(item) = stream.next().await {
         let chunk = item?;
         file.write_all(&chunk).await?;
-
         downloaded = min(downloaded + (chunk.len() as u64), total_size);
         pb.set_position(downloaded)
     }
 
     pb.set_message(format!("Writing Metadata | {}", track_info));
-    get_meta(track, dl_path).await?;
+    write_metadata(track, dl_path).await?;
     pb.println(format!("Download Complete | {}", track_info));
     Ok(true)
 }
 
 pub async fn download_album(id: usize) -> Result<bool, Error> {
     let config = CONFIG.read().await;
-    //https://tidal.com/browse/album/86697999
-    let album = get_album(id).await.unwrap();
-    let url = format!("https://api.tidal.com/v1/albums/{}/items", album.id);
+    let url = format!("https://api.tidal.com/v1/albums/{}/items", id);
     let tracks = get_items::<ItemResponseItem<Track>>(&url, None, None).await?;
+
     let mp = MultiProgress::new();
     mp.set_draw_target(ProgressDrawTarget::stdout_with_hz(
         config.progress_refresh_rate,
     ));
+
     stream::iter(tracks)
+        //download each album in a new greenthread
         .map(|track| tokio::task::spawn(download_track(track.item.id, Some(mp.clone()))))
+        //up to the specified amount concurrently
         .buffer_unordered(config.concurrency.into())
         .for_each(|r| async {
             match r {
@@ -114,12 +98,22 @@ pub async fn download_album(id: usize) -> Result<bool, Error> {
 pub async fn download_artist(id: usize) -> Result<bool, Error> {
     let config = CONFIG.read().await;
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
-    let mut albums = get_items::<Album>(&url, None, None).await?;
-
+    let mut albums: Vec<Album> = Vec::new();
+    let album_req = get_items::<Album>(&url, None, None);
+    // if we need to also grab singles
     if config.include_singles {
         let filter = vec![("filter".to_string(), "EPSANDSINGLES".to_string())];
-        let mut singles = get_items::<Album>(&url, Some(filter), None).await?;
-        albums.append(&mut singles);
+        let singles = get_items::<Album>(&url, Some(filter), None);
+        //execute the two requests concurrently
+        let results = try_join!(album_req, singles)?;
+
+        //add the elements to the results vec
+        for mut result in [results.0, results.1] {
+            albums.append(&mut result);
+        }
+    } else {
+        //else execute the single request
+        albums = album_req.await?;
     }
 
     debug!("Got Albums successfully");
@@ -129,6 +123,7 @@ pub async fn download_artist(id: usize) -> Result<bool, Error> {
     Ok(true)
 }
 
+//Compile the regex once per invocation
 lazy_static! {
     pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\})").unwrap();
 }
@@ -166,7 +161,7 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     Ok(with_ext)
 }
 
-async fn get_meta(track: Track, path: &Path) -> Result<(), Error> {
+async fn write_metadata(track: Track, path: &Path) -> Result<(), Error> {
     let mut tag = Tag::read_from_path(path)?;
     tag.set_vorbis("TITLE", vec![track.title]);
     tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
@@ -184,9 +179,8 @@ async fn get_meta(track: Track, path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn download_cover(track: &Track) -> Result<(), Error> {
-    let path_str = get_path(track).await?;
-    let dl_path = Path::new(&path_str).parent().unwrap().join("cover.jpg");
+pub async fn download_cover(track: Track, folder: String) -> Result<(), Error> {
+    let dl_path = Path::new(&folder).parent().unwrap().join("cover.jpg");
     if dl_path.exists() {
         return Ok(());
     }
@@ -199,4 +193,26 @@ pub async fn download_cover(track: &Track) -> Result<(), Error> {
     tokio::fs::write(dl_path, pic.data).await?;
     info!("Write cover to disk");
     Ok(())
+}
+
+async fn setup_progress(mp: Option<MultiProgress>, id: usize) -> Result<ProgressBar, Error> {
+    let config = &CONFIG.read().await;
+    //Initialize Progress bar
+    let pb: ProgressBar;
+    if config.show_progress {
+        if let Some(mpb) = mp.as_ref() {
+            pb = mpb.add(ProgressBar::new(0));
+        } else {
+            pb = ProgressBar::new(0);
+            pb.set_draw_target(ProgressDrawTarget::stdout_with_hz(
+                config.progress_refresh_rate,
+            ))
+        }
+    } else {
+        pb = ProgressBar::new(0);
+        pb.set_draw_target(ProgressDrawTarget::hidden())
+    }
+    pb.set_style(ProgressStyle::default_bar().template("{msg}\n{spinner:.green}")?);
+    pb.set_message(format!("Getting Track Details: {}", id));
+    Ok(pb)
 }
