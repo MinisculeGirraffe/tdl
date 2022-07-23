@@ -3,15 +3,17 @@
 tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
 tdl offers significant performance improvements over the original python script by utilizing async and green threads for downloading files.
-
+0.47s user 0.84s system 26% cpu 4.903 total
+0.59s user 1.12s system 27% cpu 5.096 total
+0.58s user 1.21s system 25% cpu 6.927 total
 
 Time Comparisons:
  
 | command | total | user | system | speedup | 
 | ------- | ----- | ---- | ------ | ------- |
-| tdl concurrency 5 | 6.447s | 0.63s | 1.10s | 509% |
-| tdl concurrency 3 | 6.965 |  0.60s | 1.05s | 471% |
-| tdl concurrency 1 | 14.001 | 0.76s | 1.46s | 234% |
+| tdl concurrency 5 | 4.903s | 0.47s | 0.84s | 669% |
+| tdl concurrency 3 | 5.096s |  0.59s | 1.12s | 644% |
+| tdl concurrency 1 | 6.927s | 0.58s | 1.21s | 473% |
 | tidal-dl | 32.827s | 5.54s  | 2.53s | 100% | 
 
 ## Usage
