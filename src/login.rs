@@ -13,9 +13,8 @@ use tokio::time::{interval, sleep, Duration, Instant};
 
 pub async fn login_web() -> Result<bool, Error> {
     let code = get_device_code().await?;
-    let term = Term::stdout();
     let now = Instant::now();
-    let task = display_login_prompt(code.clone(), now);
+    let prompt = show_prompt(code.clone(), now);
 
     while now.elapsed().as_secs() <= code.expires_in {
         let login = check_auth_status(&code.device_code).await;
@@ -23,10 +22,10 @@ pub async fn login_web() -> Result<bool, Error> {
             sleep(Duration::from_secs(code.interval)).await;
             continue;
         }
-        task.abort(); // kill greenthread displaying console prompt
-        term.show_cursor()?;
+        hide_prompt(prompt);
         let timestamp = chrono::Utc::now().timestamp();
         let mut config = CONFIG.write().await;
+        //login will not be error if this is reached.
         let login_results = login?;
         config.login_key.device_code = Some(code.device_code);
         config.login_key.access_token = Some(login_results.access_token);
@@ -37,8 +36,7 @@ pub async fn login_web() -> Result<bool, Error> {
         config.save()?;
         return Ok(true);
     }
-    task.abort();
-    term.show_cursor()?;
+    hide_prompt(prompt);
     println!("Login Request timed out. Please generate a new code");
     Ok(false)
 }
@@ -68,7 +66,7 @@ pub async fn login_config() -> Result<bool, Error> {
     ))
 }
 
-fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandle<()> {
+fn show_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandle<()> {
     tokio::task::spawn(async move {
         let clocks = vec![
             "🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚",
@@ -108,6 +106,11 @@ fn display_login_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandl
             }
         }
     })
+}
+
+fn hide_prompt(task: JoinHandle<()>) {
+    task.abort();
+    let _ = Term::stdout().show_cursor();
 }
 
 fn fmt_login(uri: &str) -> String {
