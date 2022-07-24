@@ -61,11 +61,11 @@ async fn get(matches: &ArgMatches) {
         }
         //drop the tx channel spawned in this thread to prevent indefinite blocking
         drop(tx);
-
+        let config = CONFIG.read().await;
         let stream = ReceiverStream::new(rx);
         stream
             .map(|i| async { i.await })
-            .buffer_unordered(3)
+            .buffer_unordered(config.concurrency.into())
             .for_each(|r| async {
                 match r {
                     Ok(_) => {}
