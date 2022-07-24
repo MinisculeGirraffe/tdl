@@ -1,5 +1,52 @@
 use anyhow::Error;
-use std::{fmt, str::FromStr};
+use futures::Future;
+use indicatif::{MultiProgress, ProgressStyle};
+use tokio::sync::mpsc::{Receiver, Sender};
+
+use std::{fmt, pin::Pin, str::FromStr};
+
+use crate::api::models::Track;
+
+pub type ChannelValue = Pin<Box<dyn Future<Output = Result<bool, Error>> + Sync + Send>>;
+pub type ReceiveChannel = Receiver<ChannelValue>;
+
+#[derive(Clone)]
+pub struct DownloadTask {
+    pub progress: MultiProgress,
+    pub channel: Sender<ChannelValue>,
+}
+
+pub struct ProgressBar(indicatif::ProgressBar);
+
+impl ProgressBar {
+    pub fn new(parent: MultiProgress, id: usize) -> Self {
+        let pb = parent.add(indicatif::ProgressBar::new(0));
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg}\n{spinner:.green}")
+                .unwrap(),
+        );
+        pb.set_message(format!("Getting Track Details: {}", id));
+
+        Self(pb)
+    }
+
+    pub fn start_download(&self, length: u64, track: &Track) {
+        self.0.set_length(length);
+        self.0.set_style(ProgressStyle::default_bar()
+                        .template("{msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})").unwrap()
+                        .progress_chars("#>-"));
+        self.0
+            .set_message(format!("Downloading File | {}", track.get_info()));
+    }
+    pub fn println(&self, s: impl ToString) {
+        let _ = &self.0.println(s.to_string());
+    }
+    pub fn set_position(&self, i: u64) {
+        let _ = &self.0.set_position(i);
+    }
+}
+
 #[derive(Debug)]
 pub struct Action {
     pub kind: ActionKind,

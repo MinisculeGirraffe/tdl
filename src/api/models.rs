@@ -193,6 +193,14 @@ pub struct Track {
     pub mixes: TrackMix,
 }
 
+impl Track {
+    pub fn get_info(&self) -> String {
+        format!(
+            "[{}] {} - {}",
+            self.track_number, self.artist.name, self.title
+        )
+    }
+}
 impl Named for Track {
     fn get_name(&self) -> &str {
         &self.title

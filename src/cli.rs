@@ -12,12 +12,19 @@ pub fn cli() -> Command<'static> {
         .subcommand_required(true)
         .subcommand(get())
         .subcommand(search())
-        .subcommand(Command::new("login"))
-        .subcommand(Command::new("logout"))
+        .subcommand(
+            Command::new("login").about(
+                "Displays the login prompt or re-authenticates with the current access token",
+            ),
+        )
+        .subcommand(
+            Command::new("logout").about("Logs out via the TIDAL API and resets the login config"),
+        )
 }
 
 fn get() -> Command<'static> {
     Command::new("get")
+        .about("Downloads files from the provided TIDAL links")
         .arg(
             arg!(<URL>)
                 .multiple_values(true)
@@ -37,6 +44,7 @@ fn get() -> Command<'static> {
 
 fn search() -> Command<'static> {
     Command::new("search")
+        .about("Searches the TIDAL API")
         .arg(
             Arg::new("query")
                 .takes_value(true)
