@@ -13,8 +13,12 @@ use clap::ArgMatches;
 use cli::cli;
 use download::{download_album, download_artist, download_track};
 use env_logger::Env;
+use futures::StreamExt;
+use indicatif::{MultiProgress, ProgressDrawTarget};
 use models::{Action, ActionKind};
 use std::str::FromStr;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[tokio::main]
 async fn main() {
@@ -40,14 +44,35 @@ async fn get(matches: &ArgMatches) {
     }
 
     if let Some(urls) = matches.get_many::<String>("URL") {
+        let (tx, rx) = mpsc::channel(100);
+        let progress = setup_progress().await;
+
         for url in urls {
             let action = Action::from_str(url).expect("invalid URL supplied");
-            let _ = match action.kind {
-                ActionKind::Track => download_track(action.id, None).await,
-                ActionKind::Album => download_album(action.id).await,
-                ActionKind::Artist => download_artist(action.id).await,
-            };
+            let bar = progress.clone();
+            let tx = tx.clone();
+            let _ = tokio::task::spawn(async move {
+                let _ = match action.kind {
+                    ActionKind::Track => download_track(action.id, bar).await,
+                    ActionKind::Album => download_album(action.id, bar, tx).await,
+                    ActionKind::Artist => download_artist(action.id, bar, tx).await,
+                };
+            });
         }
+        //drop the tx channel spawned in this thread to prevent indefinite blocking
+        drop(tx);
+
+        let stream = ReceiverStream::new(rx);
+        stream
+            .map(|i| async { i.await })
+            .buffer_unordered(3)
+            .for_each(|r| async {
+                match r {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("{e}"),
+                }
+            })
+            .await;
     }
 }
 
@@ -80,4 +105,21 @@ pub async fn login() {
         return;
     }
     panic!("All Login methods failed")
+}
+
+async fn setup_progress() -> MultiProgress {
+    let config = CONFIG.read().await;
+    let mp = MultiProgress::new();
+    mp.set_draw_target(get_draw_target(
+        config.show_progress,
+        config.progress_refresh_rate,
+    ));
+    mp
+}
+
+fn get_draw_target(show_progress: bool, refresh_rate: u8) -> ProgressDrawTarget {
+    match show_progress {
+        true => ProgressDrawTarget::stdout_with_hz(refresh_rate),
+        false => ProgressDrawTarget::hidden(),
+    }
 }

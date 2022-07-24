@@ -4,9 +4,8 @@ use crate::api::{get_items, REQ};
 use crate::config::CONFIG;
 use anyhow::anyhow;
 use anyhow::Error;
-use futures::stream;
 use futures::StreamExt;
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
 use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
@@ -15,11 +14,17 @@ use regex::{Captures, Regex};
 use sanitize_filename::sanitize;
 use std::cmp::min;
 use std::path::Path;
+use std::pin::Pin;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc::Sender;
+
 use tokio::try_join;
 
-pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool, Error> {
+type DownloadTask =
+    Sender<Pin<Box<dyn futures::Future<Output = Result<bool, anyhow::Error>> + Sync + Send>>>;
+
+pub async fn download_track(id: usize, mp: MultiProgress) -> Result<bool, Error> {
     let config = CONFIG.read().await;
     let (pb, track) = try_join!(setup_progress(mp, id), get_track(id))?;
     let track_info = format!(
@@ -70,32 +75,22 @@ pub async fn download_track(id: usize, mp: Option<MultiProgress>) -> Result<bool
     Ok(true)
 }
 
-pub async fn download_album(id: usize) -> Result<bool, Error> {
-    let config = CONFIG.read().await;
+pub async fn download_album(id: usize, mp: MultiProgress, tx: DownloadTask) -> Result<bool, Error> {
     let url = format!("https://api.tidal.com/v1/albums/{}/items", id);
     let tracks = get_items::<ItemResponseItem<Track>>(&url, None, None).await?;
-
-    let mp = MultiProgress::new();
-    mp.set_draw_target(ProgressDrawTarget::stdout_with_hz(
-        config.progress_refresh_rate,
-    ));
-
-    stream::iter(tracks)
-        //download each album in a new greenthread
-        .map(|track| tokio::task::spawn(download_track(track.item.id, Some(mp.clone()))))
-        //up to the specified amount concurrently
-        .buffer_unordered(config.concurrency.into())
-        .for_each(|r| async {
-            match r {
-                Ok(_) => {}
-                Err(_e) => panic!("download failed"),
-            }
-        })
-        .await;
-
+    for track in tracks {
+        let handle = download_track(track.item.id, mp.clone());
+        if (tx.send(Box::pin(handle)).await).is_err() {
+            panic!("receiver dropped");
+        }
+    }
     Ok(true)
 }
-pub async fn download_artist(id: usize) -> Result<bool, Error> {
+pub async fn download_artist(
+    id: usize,
+    mp: MultiProgress,
+    tx: DownloadTask,
+) -> Result<bool, Error> {
     let config = CONFIG.read().await;
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
     let mut albums: Vec<Album> = Vec::new();
@@ -105,7 +100,7 @@ pub async fn download_artist(id: usize) -> Result<bool, Error> {
         let filter = vec![("filter".to_string(), "EPSANDSINGLES".to_string())];
         let singles = get_items::<Album>(&url, Some(filter), None);
         //execute the two requests concurrently
-        let results = try_join!(album_req, singles)?;
+        let results = try_join!(album_req, singles).unwrap();
 
         //add the elements to the results vec
         for mut result in [results.0, results.1] {
@@ -113,13 +108,13 @@ pub async fn download_artist(id: usize) -> Result<bool, Error> {
         }
     } else {
         //else execute the single request
-        albums = album_req.await?;
+        albums = album_req.await.unwrap();
     }
 
-    debug!("Got Albums successfully");
     for album in albums {
-        download_album(album.id).await?;
+        download_album(album.id, mp.clone(), tx.clone()).await?;
     }
+
     Ok(true)
 }
 
@@ -195,23 +190,10 @@ pub async fn download_cover(track: Track, folder: String) -> Result<(), Error> {
     Ok(())
 }
 
-async fn setup_progress(mp: Option<MultiProgress>, id: usize) -> Result<ProgressBar, Error> {
-    let config = &CONFIG.read().await;
+async fn setup_progress(mp: MultiProgress, id: usize) -> Result<ProgressBar, Error> {
     //Initialize Progress bar
-    let pb: ProgressBar;
-    if config.show_progress {
-        if let Some(mpb) = mp.as_ref() {
-            pb = mpb.add(ProgressBar::new(0));
-        } else {
-            pb = ProgressBar::new(0);
-            pb.set_draw_target(ProgressDrawTarget::stdout_with_hz(
-                config.progress_refresh_rate,
-            ))
-        }
-    } else {
-        pb = ProgressBar::new(0);
-        pb.set_draw_target(ProgressDrawTarget::hidden())
-    }
+    let pb = mp.add(ProgressBar::new(0));
+
     pb.set_style(ProgressStyle::default_bar().template("{msg}\n{spinner:.green}")?);
     pb.set_message(format!("Getting Track Details: {}", id));
     Ok(pb)
