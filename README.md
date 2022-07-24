@@ -1,11 +1,11 @@
 # tdl
 
+# Overview 
 tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
-tdl offers significant performance improvements over the original python script by utilizing async and green threads for downloading files.
+tdl offers significant performance improvements over the original python script by utilizing async and multi threaded concurrency. tdl will download multiple files concurrently, while simultaneously pre-processing future queue items in the background to minimize time spent not downloading.
 
-
-Time Comparisons:
+Time Comparisons of tdl at various concurrency levels compared to the original implementation:
  
 | command | total | user | system | speedup | 
 | ------- | ----- | ---- | ------ | ------- |
@@ -16,13 +16,13 @@ Time Comparisons:
 
 ## Usage
 
-Get a single item
+- Get a single item
 ```
 tdl get <URL>
 tdl get https://tidal.com/browse/album/129835816
 ```
 
-Get multiple items
+- Get multiple items
 ```
 tdl get <URL1> <URL2> 
 tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/147102710  
@@ -30,7 +30,7 @@ tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/
 
 ## Config Setup
 
-Configs are stored in `~/.config/tdl/config.toml`
+Configs are stored in `~/.config/tdl/config.toml`, and will auto-generate with the default settings when the executable is ran. 
 
 ### download_path
 
