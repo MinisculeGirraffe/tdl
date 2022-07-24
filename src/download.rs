@@ -1,9 +1,10 @@
-use crate::api::media::{get_album, get_cover_data, get_stream_url, get_track};
+use crate::api::media::{get_album, get_album_items, get_cover_data, get_stream_url, get_track};
 use crate::api::models::*;
 use crate::api::{get_items, REQ};
 use crate::config::CONFIG;
 use anyhow::anyhow;
 use anyhow::Error;
+use futures::future::join_all;
 use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
@@ -91,30 +92,14 @@ pub async fn download_artist(
     mp: MultiProgress,
     tx: DownloadTask,
 ) -> Result<bool, Error> {
-    let config = CONFIG.read().await;
-    let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
-    let mut albums: Vec<Album> = Vec::new();
-    let album_req = get_items::<Album>(&url, None, None);
-    // if we need to also grab singles
-    if config.include_singles {
-        let filter = vec![("filter".to_string(), "EPSANDSINGLES".to_string())];
-        let singles = get_items::<Album>(&url, Some(filter), None);
-        //execute the two requests concurrently
-        let results = try_join!(album_req, singles).unwrap();
+    let albums = get_album_items(id).await?;
 
-        //add the elements to the results vec
-        for mut result in [results.0, results.1] {
-            albums.append(&mut result);
-        }
-    } else {
-        //else execute the single request
-        albums = album_req.await.unwrap();
-    }
-
+    let mut tasks = Vec::new();
     for album in albums {
-        download_album(album.id, mp.clone(), tx.clone()).await?;
+        tasks.push(download_album(album.id, mp.clone(), tx.clone()));
     }
-
+    // await all the album tasks concurrently
+    join_all(tasks).await;
     Ok(true)
 }
 
@@ -193,7 +178,6 @@ pub async fn download_cover(track: Track, folder: String) -> Result<(), Error> {
 async fn setup_progress(mp: MultiProgress, id: usize) -> Result<ProgressBar, Error> {
     //Initialize Progress bar
     let pb = mp.add(ProgressBar::new(0));
-
     pb.set_style(ProgressStyle::default_bar().template("{msg}\n{spinner:.green}")?);
     pb.set_message(format!("Getting Track Details: {}", id));
     Ok(pb)
