@@ -34,7 +34,6 @@ fn get() -> Command<'static> {
                 .min_values(1)
                 .required(true)
                 .value_parser(NonEmptyStringValueParser::new())
-                .value_names(&["URL1", "..."])
                 .help("One or multiple space separated URLs to download"),
         )
         .arg(

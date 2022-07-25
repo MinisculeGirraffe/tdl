@@ -77,17 +77,14 @@ async fn download_album(id: usize, task: DownloadTask) -> Result<bool, Error> {
     let url = format!("https://api.tidal.com/v1/albums/{}/items", id);
     let tracks = get_items::<ItemResponseItem<Track>>(&url, None, None).await?;
     for track in tracks {
-        match download_track(track.item.id, task.clone()).await {
-            Ok(_) => {}
-            Err(_) => task.progress.println("Error downloading track")?,
-        };
+        tokio::task::spawn(download_track(track.item.id, task.clone()));
     }
     Ok(true)
 }
 async fn download_artist(id: usize, task: DownloadTask) -> Result<bool, Error> {
     let albums = get_album_items(id).await?;
     for album in albums {
-        download_album(album.id, task.clone()).await?;
+        tokio::task::spawn(download_album(album.id, task.clone()));
     }
     Ok(true)
 }
