@@ -267,7 +267,7 @@ impl FromStr for PlaybackManifest {
     }
 }
 
-#[derive(SerializeDisplay, DeserializeFromStr, Clone, Debug)]
+#[derive(SerializeDisplay, DeserializeFromStr, Clone, Debug, Copy)]
 ///LOW(96kbps AAC)
 ///HIGH(320kbps AAC)
 ///LOSSLESS(1411kbps|16bit/44.1kHz FLAC/ALAC)
@@ -299,6 +299,21 @@ impl FromStr for AudioQuality {
             "LOSSLESS" => Ok(AudioQuality::Lossless),
             "HI_RES" => Ok(AudioQuality::HiRes),
             _ => Err("Error".to_string()),
+        }
+    }
+}
+
+impl clap::ValueEnum for AudioQuality {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Low, Self::High, Self::Lossless, Self::HiRes]
+    }
+
+    fn to_possible_value<'a>(&self) -> Option<clap::PossibleValue<'a>> {
+        match self {
+            Self::HiRes => Some(clap::PossibleValue::new("max")),
+            Self::Lossless => Some(clap::PossibleValue::new("lossless")),
+            Self::High => Some(clap::PossibleValue::new("high")),
+            Self::Low => Some(clap::PossibleValue::new("low")),
         }
     }
 }

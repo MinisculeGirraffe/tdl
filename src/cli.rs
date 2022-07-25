@@ -1,8 +1,13 @@
 use clap::{
     arg,
-    builder::{NonEmptyStringValueParser, PossibleValuesParser, RangedU64ValueParser},
-    value_parser, Arg, Command,
+    builder::{
+        BoolishValueParser, EnumValueParser, NonEmptyStringValueParser, PossibleValuesParser,
+        RangedU64ValueParser,
+    },
+    value_parser, Arg, ArgMatches, Command,
 };
+
+use crate::{api::models::AudioQuality, config::CONFIG};
 
 pub fn cli() -> Command<'static> {
     Command::new(env!("CARGO_PKG_NAME"))
@@ -13,12 +18,10 @@ pub fn cli() -> Command<'static> {
         .subcommand(get())
         .subcommand(search())
         .subcommand(
-            Command::new("login").about(
-                "Displays the login prompt or re-authenticates with the current access token",
-            ),
+            Command::new("login").about("Login or re-authenticates with the current access token"),
         )
         .subcommand(
-            Command::new("logout").about("Logs out via the TIDAL API and resets the login config"),
+            Command::new("logout").about("Logout via the TIDAL API and resets the login config"),
         )
 }
 
@@ -28,17 +31,54 @@ fn get() -> Command<'static> {
         .arg(
             arg!(<URL>)
                 .multiple_values(true)
-                .required(true)
                 .min_values(1)
+                .required(true)
                 .value_parser(NonEmptyStringValueParser::new())
-                .help("The Tidal URL to download"),
+                .value_names(&["URL1", "..."])
+                .help("One or multiple space separated URLs to download"),
         )
         .arg(
-            arg!(--concurrent <VALUE>)
+            Arg::new("concurrent")
                 .short('c')
+                .long("concurrent")
+                .display_order(0)
                 .required(false)
+                .takes_value(true)
                 .value_parser(RangedU64ValueParser::<u8>::new().range(1..10))
-                .help("Number of songs to download concurrently"),
+                .value_name("number")
+                .help("Number of tracks to download simultaneously"),
+        )
+        .arg(
+            Arg::new("quality")
+                .short('q')
+                .long("quality")
+                .display_order(1)
+                .required(false)
+                .takes_value(true)
+                .value_parser(EnumValueParser::<AudioQuality>::new())
+                .help("Requested audio quality of tracks"),
+        )
+        .arg(
+            Arg::new("progress")
+                .short('p')
+                .long("show-progress")
+                .required(false)
+                .takes_value(true)
+                .display_order(2)
+                .value_parser(BoolishValueParser::new())
+                .value_name("boolish")
+                .help("Display the progress bar when downloading files"),
+        )
+        .arg(
+            Arg::new("singles")
+                .short('s')
+                .long("include-singles")
+                .required(false)
+                .takes_value(true)
+                .display_order(3)
+                .value_parser(BoolishValueParser::new())
+                .value_name("boolish")
+                .help("Include singles with getting lists of albums"),
         )
 }
 
@@ -59,6 +99,7 @@ fn search() -> Command<'static> {
                 .value_parser(PossibleValuesParser::new([
                     "all", "artist", "album", "track", "playlist",
                 ]))
+                .value_name("type")
                 .takes_value(true)
                 .help("Type of results to return from search"),
         )
@@ -68,6 +109,30 @@ fn search() -> Command<'static> {
                 .short('m')
                 .takes_value(true)
                 .value_parser(value_parser!(u32))
+                .value_name("number")
                 .help("Maximum number of items to return"),
         )
+}
+
+pub async fn parse_config_flags(matches: &ArgMatches) {
+    let mut config = CONFIG.write().await;
+    let flags = ["concurrent", "progress", "singles", "quality"];
+    for flag in flags {
+        match flag {
+            "concurrent" => set_val::<u8>(&mut config.concurrency, flag, matches),
+            "progress" => set_val::<bool>(&mut config.show_progress, flag, matches),
+            "singles" => set_val::<bool>(&mut config.include_singles, flag, matches),
+            "quality" => set_val::<AudioQuality>(&mut config.audio_quality, flag, matches),
+            _ => continue,
+        };
+    }
+}
+
+fn set_val<'a, T>(dst: &mut T, flag: &str, matches: &'a ArgMatches)
+where
+    T: Send + Sync + Copy + Clone + 'static,
+{
+    if let Ok(Some(v)) = matches.try_get_one::<T>(flag) {
+        let _ = std::mem::replace(dst, *v);
+    }
 }

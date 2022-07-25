@@ -1,6 +1,6 @@
 [package]
 name = "tdl"
-description = "A command line tool for downloading files from the Tidal API"
+description = "A command line tool for downloading files from the TIDAL API"
 version = "0.1.6"
 edition = "2021"
 

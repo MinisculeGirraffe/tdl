@@ -12,7 +12,7 @@ use api::auth::logout;
 use api::models::{Album, Artist, Track};
 use api::search::search_content;
 use clap::ArgMatches;
-use cli::cli;
+use cli::{cli, parse_config_flags};
 use download::dispatch_downloads;
 use env_logger::Env;
 use futures::StreamExt;
@@ -38,9 +38,8 @@ async fn main() {
 
 async fn get(matches: &ArgMatches) {
     login().await;
-    if let Some(concurrent) = matches.get_one::<u8>("concurrent") {
-        CONFIG.write().await.concurrency = *concurrent;
-    }
+    parse_config_flags(matches).await;
+
     if let Some(urls) = matches.get_many::<String>("URL") {
         let channel = dispatch_downloads(urls).await;
         let concurrency = CONFIG.read().await.concurrency;
