@@ -1,18 +1,25 @@
 # tdl
 
-# Overview 
+## Overview 
 tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
 tdl offers significant performance improvements over the original python script by utilizing async and multi threaded concurrency. tdl will download multiple files concurrently, while simultaneously pre-processing future queue items in the background to minimize time spent not downloading.
 
-Time Comparisons of tdl at various concurrency levels compared to the original implementation:
- 
+
+ Download Files:
 | command | total | user | system | speedup | 
 | ------- | ----- | ---- | ------ | ------- |
-| tdl concurrency 5 | 4.903s | 0.47s | 0.84s | 669% |
-| tdl concurrency 3 | 5.096s |  0.59s | 1.12s | 644% |
-| tdl concurrency 1 | 6.927s | 0.58s | 1.21s | 473% |
-| tidal-dl | 32.827s | 5.54s  | 2.53s | 100% | 
+| tdl -c 5 | 0m26.355s | 0m3.144s | 0m7.063s | 1008% |
+| tidal-dl (max concurrency) | 4m25.765s | 3m51.389s | 0m16.369s | 100% | 
+
+
+Check Downloaded Files:
+| command | total | user | system | speedup | 
+| ------- | ----- | ---- | ------ | ------- |
+| tdl -c 5 | 0m0.552s | 0m0.030s | 0m0.010s | 2438% |
+| tidal-dl (max concurrency) |  0m13.463s | 0m7.813s | 0m0.214s | 100% | 
+
+benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink
 
 ## Usage
 
