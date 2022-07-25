@@ -3,29 +3,7 @@ tdl is a rust implementation of the Python Script [Tidal-Media-Downloader](https
 
 ## Overview 
 
-tdl offers significant performance improvements over the original python script by utilizing asynchronous multi-threaded concurrency while also using significantly less resources in the process.
-
-### Benchmarks
-
-#### Download files (Multi/Single Threaded):
-
-| command | total | user | system | speedup | 
-| ------- | ----- | ---- | ------ | ------- |
-| `tdl` (multi-threaded) | 0m26.355s | 0m3.144s | 0m7.063s | 13.03x |
-| `tdl` (single-threaded) | 1m25.612s | 0m4.148s | 0m10.257s | 4.01x | 
-| `tidal-dl` (multi-threaded) | 4m25.765s | 3m51.389s | 0m16.369s | 1.29x | 
-| `tidal-dl` (single-threaded) |  5m43.370s | 3m44.142s |  0m13.727s | 1.00x |
-
-#### Check Downloaded Files:
-
-| command | total | user | system | speedup | 
-| ------- | ----- | ---- | ------ | ------- |
-| `tdl` | 0m0.552s | 0m0.030s | 0m0.010s | 57.34x |
-| `tidal-dl` (multi-threaded) |  0m13.463s | 0m7.813s | 0m0.214s | 2.35x | 
-| `tidal-dl` (single-threaded)| 0m31.686s | 0m 10.191s | 0m0.321s | 1.00x |
-
-
-Benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink.
+tdl offers significant performance improvements over the original python script by utilizing asynchronous multi-threaded concurrency while also being 50-100 times more CPU efficient.
 
 ## Usage
 
@@ -40,6 +18,36 @@ tdl get https://tidal.com/browse/album/129835816
 tdl get <URL1> <URL2> 
 tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/147102710  
 ```
+
+### Benchmarks
+
+Benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink.
+
+#### Download files (Multi/Single Threaded):
+
+| command | real | user | system | real speedup | user speedup |
+| ------- | ----- | ---- | ------ | ------- |------- |
+| `tdl` (multi-threaded) | 0m26.355s | 0m3.144s | 0m7.063s | 13.03x | 71.29x |
+| `tdl` (single-threaded) | 1m25.612s | 0m4.148s | 0m10.257s | 4.01x | 54.03x |
+| `tidal-dl` (multi-threaded) | 4m25.765s | 3m51.389s | 0m16.369s | 1.29x | 0.96x | 
+| `tidal-dl` (single-threaded) |  5m43.370s | 3m44.142s |  0m13.727s | 1.00x | 1.00x |
+
+
+#### Check Downloaded Files:
+
+| command | real | user | system | real speedup | user speedup |
+| ------- | ----- | ---- | ------ | ------- |------- |
+| `tdl` | 0m0.552s | 0m0.030s | 0m0.010s | 57.34x | 101.91x | 
+| `tidal-dl` (multi-threaded) |  0m13.463s | 0m7.813s | 0m0.214s | 2.35x | 1.30x |
+| `tidal-dl` (single-threaded)| 0m31.686s | 0m 10.191s | 0m0.321s | 1.00x | 1.00x| 
+
+#### Legend
+- `real`: The actual time spent in running the process from start to finish, as if it was measured by a human with a stopwatch
+- `user`: The cumulative time spent by all the CPUs during the computation. Time spent waiting for I/O does not count towards this counter
+- `sys`: The cumulative time spent by all the CPUs during system-related tasks such as memory allocation.
+- `real speedup`: Multiplier of total time saved.
+- `user speedup`: Multiplier of total CPU time saved. 
+
 
 ## Config Setup
 
