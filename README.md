@@ -1,25 +1,31 @@
 # tdl
+tdl is a rust implementation of the Python Script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
 ## Overview 
-tdl is a rust implementation of the python script [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
 
-tdl offers significant performance improvements over the original python script by utilizing async and multi threaded concurrency. tdl will download multiple files concurrently, while simultaneously pre-processing future queue items in the background to minimize time spent not downloading.
+tdl offers significant performance improvements over the original python script by utilizing asynchronous multi-threaded concurrency while also using significantly less resources in the process.
 
+### Benchmarks
 
- Download Files:
+#### Download files (Multi/Single Threaded):
+
 | command | total | user | system | speedup | 
 | ------- | ----- | ---- | ------ | ------- |
-| tdl -c 5 | 0m26.355s | 0m3.144s | 0m7.063s | 1008% |
-| tidal-dl (max concurrency) | 4m25.765s | 3m51.389s | 0m16.369s | 100% | 
+| `tdl` (multi-threaded) | 0m26.355s | 0m3.144s | 0m7.063s | 13.03x |
+| `tdl` (single-threaded) | 1m25.612s | 0m4.148s | 0m10.257s | 4.01x | 
+| `tidal-dl` (multi-threaded) | 4m25.765s | 3m51.389s | 0m16.369s | 1.29x | 
+| `tidal-dl` (single-threaded) |  5m43.370s | 3m44.142s |  0m13.727s | 1.00x |
 
+#### Check Downloaded Files:
 
-Check Downloaded Files:
 | command | total | user | system | speedup | 
 | ------- | ----- | ---- | ------ | ------- |
-| tdl -c 5 | 0m0.552s | 0m0.030s | 0m0.010s | 2438% |
-| tidal-dl (max concurrency) |  0m13.463s | 0m7.813s | 0m0.214s | 100% | 
+| `tdl` | 0m0.552s | 0m0.030s | 0m0.010s | 57.34x |
+| `tidal-dl` (multi-threaded) |  0m13.463s | 0m7.813s | 0m0.214s | 2.35x | 
+| `tidal-dl` (single-threaded)| 0m31.686s | 0m 10.191s | 0m0.321s | 1.00x |
 
-benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink
+
+Benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink.
 
 ## Usage
 
