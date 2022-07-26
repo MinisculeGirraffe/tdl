@@ -3,7 +3,7 @@ tdl is a rust implementation of the Python Script [Tidal-Media-Downloader](https
 
 ## Overview 
 
-tdl offers significant performance improvements over the original python script by utilizing asynchronous multi-threaded concurrency while also being 50-100 times more CPU efficient.
+tdl offers significant performance improvements over the original python script by utilizing asynchronous multi-threaded concurrency via tokio the work stealing scheduler.
 
 ## Usage
 
