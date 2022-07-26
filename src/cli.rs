@@ -45,7 +45,7 @@ fn get() -> Command<'static> {
                 .takes_value(true)
                 .value_parser(RangedU64ValueParser::<u8>::new().range(1..11))
                 .value_name("number")
-                .help("Maximum number of concurrent downloads"),
+                .help("Maximum number of concurrent downloads."),
         )
         .arg(
             Arg::new("workers")
@@ -56,7 +56,7 @@ fn get() -> Command<'static> {
                 .takes_value(true)
                 .value_parser(RangedU64ValueParser::<u8>::new().range(1..256))
                 .value_name("number")
-                .help("Maximum number of concurrent API requests"),
+                .help("Maximum number of concurrent API requests. Increase this if downloads are slow to queue up"),
         )
         .arg(
             Arg::new("quality")
