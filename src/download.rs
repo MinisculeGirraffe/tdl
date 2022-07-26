@@ -43,13 +43,20 @@ async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<
     while let Some(item) = stream.next().await {
         let chunk = item?;
         downloaded = min(downloaded + (chunk.len() as u64), total_size);
-        writer.write_all(&chunk).await?;
         pb.set_position(downloaded);
+        writer.write_all(&chunk).await?;
     }
+
     //flush buffer to disk;
-    writer.flush().await?;
-    write_metadata(track, dl_path).await?;
-    pb.println(format!("Download Complete | {info}"));
+    //but don't do it in this thread so we can start downloading the next file right away
+    tokio::task::spawn(async move {
+        pb.set_message(format!("Writing to Disk | {info}"));
+        writer.flush().await.ok();
+        pb.set_message(format!("Writing metadata | {info}"));
+        write_metadata(track, path).await.ok();
+        pb.println(format!("Download Complete | {info}"));
+    });
+
     Ok(true)
 }
 
@@ -168,7 +175,8 @@ async fn get_path(track: &Track) -> Result<String, Error> {
     Ok(with_ext)
 }
 
-async fn write_metadata(track: Track, path: &Path) -> Result<(), Error> {
+async fn write_metadata(track: Track, path: String) -> Result<(), Error> {
+    let path = Path::new(&path);
     let mut tag = Tag::read_from_path(path)?;
     tag.set_vorbis("TITLE", vec![track.title]);
     tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
