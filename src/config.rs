@@ -15,7 +15,8 @@ pub struct Settings {
     pub show_progress: bool,
     pub progress_refresh_rate: u8,
     pub include_singles: bool,
-    pub concurrency: u8,
+    pub downloads: u8,
+    pub workers: u8,
     pub download_cover: bool,
     pub login_key: LoginKey,
     pub api_key: ApiKey,
@@ -66,7 +67,8 @@ pub fn get_config() -> Result<Settings, Error> {
         .set_default("login_key.device_code", "")?
         .set_default("login_key.country_code", "")?
         .set_default("download_cover", true)?
-        .set_default("concurrency", 3)?
+        .set_default("downloads", 1)?
+        .set_default("workers", 1)?
         .set_default("login_key.access_token", "")?
         .set_default("login_key.refresh_token", "")?
         .set_default("login_key.expires_after", 0)?

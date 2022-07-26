@@ -7,13 +7,14 @@ use std::{fmt, pin::Pin, str::FromStr};
 
 use crate::api::models::Track;
 
-pub type ChannelValue = Pin<Box<dyn Future<Output = Result<bool, Error>> + Sync + Send>>;
+pub type ChannelValue = Pin<Box<dyn Future<Output = Result<bool, Error>> + Send>>;
 pub type ReceiveChannel = Receiver<ChannelValue>;
 
 #[derive(Clone)]
 pub struct DownloadTask {
     pub progress: MultiProgress,
-    pub channel: Sender<ChannelValue>,
+    pub dl_channel: Sender<ChannelValue>,
+    pub worker_channel: Sender<ChannelValue>,
 }
 
 pub struct ProgressBar(indicatif::ProgressBar);

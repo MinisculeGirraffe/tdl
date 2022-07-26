@@ -19,9 +19,13 @@ use std::path::Path;
 use std::str::FromStr;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self};
 
-async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<bool, Error> {
+async fn download_file(
+    track: Track,
+    mp: MultiProgress,
+    path: String,
+) -> Result<bool, anyhow::Error> {
     let info = track.get_info();
     let pb = ProgressBar::new(mp, track.id);
     let dl_path = Path::new(&path);
@@ -35,8 +39,8 @@ async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
     let file = File::create(dl_path).await?;
 
-    //1 MiB Write buffer to minimize syscalls for slow i/o
-    //Reduces write CPU time from 24% to 7% of CPU time.
+    // 1 MiB Write buffer to minimize syscalls for slow i/o
+    // Reduces write CPU time from 24% to 7%.
     let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000, file);
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
@@ -62,7 +66,6 @@ async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<
 
 async fn download_track(id: usize, task: DownloadTask) -> Result<bool, Error> {
     let config = CONFIG.read().await;
-
     let track = get_track(id).await?;
     let path_str = get_path(&track).await?;
     if config.download_cover {
@@ -77,9 +80,12 @@ async fn download_track(id: usize, task: DownloadTask) -> Result<bool, Error> {
         // Exit early if the file already exists
         return Ok(false);
     }
-
+    task.progress.println(format!(
+        "Submitting Track to Download Queue: {}",
+        track.get_info()
+    ))?;
     let download = download_file(track, task.progress, path_str);
-    match task.channel.send(Box::pin(download)).await {
+    match task.dl_channel.send(Box::pin(download)).await {
         Ok(_) => Ok(true),
         Err(_) => Err(anyhow!("Submitting Download Task failed")),
     }
@@ -89,27 +95,42 @@ async fn download_album(id: usize, task: DownloadTask) -> Result<bool, Error> {
     let url = format!("https://api.tidal.com/v1/albums/{}/items", id);
     let tracks = get_items::<ItemResponseItem<Track>>(&url, None, None).await?;
     for track in tracks {
-        tokio::task::spawn(download_track(track.item.id, task.clone()));
+        task.progress
+            .println(format!("Getting Track Info for: {}", track.item.get_info()))?;
+        match task
+            .worker_channel
+            .send(Box::pin(download_track(track.item.id, task.clone())))
+            .await
+        {
+            Ok(_) => continue,
+            Err(_) => return Err(anyhow!("Error Submitting download_track")),
+        }
     }
     Ok(true)
 }
 async fn download_artist(id: usize, task: DownloadTask) -> Result<bool, Error> {
+    task.progress.println("Getting Artist Albums")?;
     let albums = get_album_items(id).await?;
     for album in albums {
-        tokio::task::spawn(download_album(album.id, task.clone()));
+        task.progress.println(format!(
+            "Getting Tracks for Album: {}",
+            album.title.unwrap_or_else(|| "".into())
+        ))?;
+        download_album(album.id, task.clone()).await?;
     }
     Ok(true)
 }
 
-pub async fn dispatch_downloads(urls: ValuesRef<'_, String>) -> ReceiveChannel {
+pub async fn dispatch_downloads(urls: ValuesRef<'_, String>) -> (ReceiveChannel, ReceiveChannel) {
     let config = CONFIG.read().await;
     let progress = setup_multi_progress(config.show_progress, config.progress_refresh_rate);
 
     // the maximum amount of items that can be buffered by the rx channel
-    // we want this larger than our total download concurrency
-    // that way when a track finishes, the next buffered task is already ready to start the DL
-    let max_buffered = config.concurrency as usize * 2;
-    let (tx, rx) = mpsc::channel(max_buffered);
+    // this should be equal to the total number of of work items possible at a single time
+    // the actual concurrent requests will be limited by the consumer.
+    let buffer_size = config.workers as usize + config.downloads as usize;
+    let (dl_tx, dl_rx) = mpsc::channel(buffer_size);
+    let (worker_tx, worker_rx) = mpsc::channel(config.workers as usize);
 
     // for every url supplied to the get command
     for url in urls {
@@ -119,13 +140,22 @@ pub async fn dispatch_downloads(urls: ValuesRef<'_, String>) -> ReceiveChannel {
         };
         let id = action.id;
         let task = DownloadTask {
-            channel: tx.clone(),
+            dl_channel: dl_tx.clone(),
+            worker_channel: worker_tx.clone(),
             progress: progress.clone(),
         };
+
         //spawn the download task for each URL in a new thread
         tokio::task::spawn(async move {
             let res = match action.kind {
-                ActionKind::Track => download_track(id, task).await,
+                ActionKind::Track => {
+                    let channel = task.worker_channel.clone();
+                    let job = Box::pin(download_track(id, task));
+                    match channel.send(job).await {
+                        Ok(_) => Ok(true),
+                        Err(_) => Err(anyhow!("Error submitting track to worker queue")),
+                    }
+                }
                 ActionKind::Album => download_album(id, task).await,
                 ActionKind::Artist => download_artist(id, task).await,
             };
@@ -135,7 +165,8 @@ pub async fn dispatch_downloads(urls: ValuesRef<'_, String>) -> ReceiveChannel {
             };
         });
     }
-    rx
+
+    (dl_rx, worker_rx)
 }
 
 //Compile the regex once per invocation
@@ -194,10 +225,10 @@ async fn write_metadata(track: Track, path: String) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn download_cover(track: Track, folder: String) -> Result<(), Error> {
+pub async fn download_cover(track: Track, folder: String) -> Result<bool, Error> {
     let dl_path = Path::new(&folder).parent().unwrap().join("cover.jpg");
     if dl_path.exists() {
-        return Ok(());
+        return Ok(false);
     }
     let cover = &track
         .album
@@ -207,7 +238,7 @@ pub async fn download_cover(track: Track, folder: String) -> Result<(), Error> {
     let pic = get_cover_data(cover).await?;
     tokio::fs::write(dl_path, pic.data).await?;
     info!("Write cover to disk");
-    Ok(())
+    Ok(true)
 }
 
 fn setup_multi_progress(show_progress: bool, refresh_rate: u8) -> MultiProgress {

@@ -37,15 +37,26 @@ fn get() -> Command<'static> {
                 .help("One or multiple space separated URLs to download"),
         )
         .arg(
-            Arg::new("concurrent")
-                .short('c')
-                .long("concurrent")
+            Arg::new("downloads")
+                .short('d')
+                .long("downloads")
                 .display_order(0)
                 .required(false)
                 .takes_value(true)
-                .value_parser(RangedU64ValueParser::<u8>::new().range(1..10))
+                .value_parser(RangedU64ValueParser::<u8>::new().range(1..11))
                 .value_name("number")
-                .help("Number of tracks to download simultaneously"),
+                .help("Number of Simultaneous file downloads"),
+        )
+        .arg(
+            Arg::new("workers")
+                .short('w')
+                .long("workers")
+                .display_order(0)
+                .required(false)
+                .takes_value(true)
+                .value_parser(RangedU64ValueParser::<u8>::new().range(1..256))
+                .value_name("number")
+                .help("Number of in-flight requests"),
         )
         .arg(
             Arg::new("quality")
@@ -115,10 +126,11 @@ fn search() -> Command<'static> {
 
 pub async fn parse_config_flags(matches: &ArgMatches) {
     let mut config = CONFIG.write().await;
-    let flags = ["concurrent", "progress", "singles", "quality"];
+    let flags = ["downloads", "workers", "progress", "singles", "quality"];
     for flag in flags {
         match flag {
-            "concurrent" => set_val::<u8>(&mut config.concurrency, flag, matches),
+            "downloads" => set_val::<u8>(&mut config.downloads, flag, matches),
+            "workers" => set_val::<u8>(&mut config.workers, flag, matches),
             "progress" => set_val::<bool>(&mut config.show_progress, flag, matches),
             "singles" => set_val::<bool>(&mut config.include_singles, flag, matches),
             "quality" => set_val::<AudioQuality>(&mut config.audio_quality, flag, matches),

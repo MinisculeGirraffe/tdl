@@ -1,10 +1,11 @@
 use super::{get, get_api_param, get_items, models::*};
 use super::{API_BASE, REQ};
 use crate::config::CONFIG;
+
 use anyhow::Error;
-use tokio::try_join;
 
 use std::str::FromStr;
+use tokio::try_join;
 
 pub async fn get_track(id: usize) -> Result<Track, Error> {
     let (token, country_code) = get_api_param().await?;

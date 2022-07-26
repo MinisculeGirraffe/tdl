@@ -17,6 +17,8 @@ use download::dispatch_downloads;
 use env_logger::Env;
 use futures::StreamExt;
 
+use models::ReceiveChannel;
+use tokio::join;
 use tokio_stream::wrappers::ReceiverStream;
 
 #[tokio::main]
@@ -39,25 +41,35 @@ async fn main() {
 async fn get(matches: &ArgMatches) {
     login().await;
     parse_config_flags(matches).await;
-
     if let Some(urls) = matches.get_many::<String>("URL") {
-        let channel = dispatch_downloads(urls).await;
-        let concurrency = CONFIG.read().await.concurrency;
-        ReceiverStream::new(channel)
-            // the return value is equal to the unexecuted future that will download the track
-            // Execute that future in a new greenthread for parallel downloading
-            .map(|i| async { tokio::task::spawn(i).await })
-            //up to a maximum concurrent downloads
-            .buffer_unordered(concurrency as usize)
-            .for_each(|r| async {
-                match r {
-                    Ok(_) => {}
-                    //if the file download failed. Print an error
-                    Err(e) => eprintln!("{e}"),
-                }
-            })
-            .await;
+        let (download, worker) = dispatch_downloads(urls).await;
+        let config = CONFIG.read().await;
+        join!(
+            consume_channel(download, config.downloads.into(),),
+            consume_channel(worker, config.workers.into())
+        );
     }
+}
+
+async fn consume_channel(channel: ReceiveChannel, concurrency: usize) {
+    //The channel receives an unexecuted future as a stream
+    ReceiverStream::new(channel)
+        //execute that future in a greenthread
+        .map(|i| async { tokio::task::spawn(i).await })
+        //up to a maximum concurrent tasks at a single time
+        .buffer_unordered(concurrency)
+        .for_each(|r| async {
+            match r {
+                Ok(l) => match l {
+                    Ok(_) => {}
+                    //if the task failed
+                    Err(f) => eprintln!("{f}"),
+                },
+                // if we failed to launch the task
+                Err(e) => eprintln!("{e}"),
+            }
+        })
+        .await;
 }
 
 async fn search(matches: &ArgMatches) {
