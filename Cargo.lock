@@ -1469,6 +1469,7 @@ dependencies = [
  "tabled",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "toml",
 ]
 
