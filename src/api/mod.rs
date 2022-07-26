@@ -16,12 +16,13 @@ static AUTH_BASE: &str = "https://auth.tidal.com/v1/oauth2";
 
 // Share reqwest client for connection pooling
 lazy_static::lazy_static! {
-     static ref CLIENT: reqwest::Client = reqwest::Client::builder()
+    pub static ref CLIENT: reqwest::Client = reqwest::Client::builder()
     //don't use the system openssl
     //use the example chrome useragent from MDN Docs as tidal API's will sometimes fail without it
     .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59")
     .build()
     .unwrap();
+
     pub static ref REQ: ClientWithMiddleware  = ClientBuilder::new(CLIENT.clone())
     .with(
         RetryTransientMiddleware::new_with_policy(

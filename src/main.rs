@@ -5,9 +5,12 @@ mod download;
 mod login;
 mod models;
 
+use std::pin::Pin;
+
 use crate::config::CONFIG;
 use crate::login::*;
 
+use anyhow::Error;
 use api::auth::logout;
 use api::models::{Album, Artist, Track};
 use api::search::search_content;
@@ -15,7 +18,7 @@ use clap::ArgMatches;
 use cli::{cli, parse_config_flags};
 use download::dispatch_downloads;
 use env_logger::Env;
-use futures::StreamExt;
+use futures::{Future, StreamExt};
 
 use models::ReceiveChannel;
 use tokio::join;
@@ -91,14 +94,16 @@ async fn search(matches: &ArgMatches) {
     }
 }
 
+type LoginResponse = Pin<Box<dyn Future<Output = Result<bool, Error>>>>;
 pub async fn login() {
-    let cfg_login = login_config().await;
-    if cfg_login.is_ok() {
-        return;
+    let methods: [LoginResponse; 2] = [Box::pin(login_config()), Box::pin(login_web())];
+
+    for method in methods {
+        match method.await {
+            Ok(_) => return,
+            Err(e) => eprintln!("{e}"),
+        }
     }
-    let web_login = login_web().await;
-    if web_login.is_ok() {
-        return;
-    }
+
     panic!("All Login methods failed")
 }

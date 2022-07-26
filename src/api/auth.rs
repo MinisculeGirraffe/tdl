@@ -6,7 +6,7 @@ use crate::api::AUTH_BASE;
 use crate::config::CONFIG;
 
 use super::{get_auth_token, models::*};
-use super::{API_BASE, REQ};
+use super::{API_BASE, CLIENT};
 
 pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
     let config = CONFIG.read().await;
@@ -17,7 +17,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
         ..Default::default()
     };
     let body = serde_urlencoded::to_string(&data)?;
-    let req = REQ
+    let req = CLIENT
         .post(format!("{}/device_authorization", &AUTH_BASE))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
@@ -33,7 +33,7 @@ pub async fn get_device_code() -> Result<DeviceAuthResponse, Error> {
 }
 
 pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
-    let req = REQ
+    let req = CLIENT
         .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
         .send()
@@ -42,7 +42,7 @@ pub async fn verify_access_token(access_token: &str) -> Result<bool, Error> {
 }
 
 pub async fn _login_access_token(access_token: &str, user_id: Option<&str>) -> Result<(), Error> {
-    let req = REQ
+    let req = CLIENT
         .get(format!("{}/sessions", &API_BASE))
         .bearer_auth(access_token)
         .send()
@@ -85,7 +85,7 @@ pub async fn refresh_access_token(refresh_token: &str) -> Result<RefreshResponse
     };
     let body = serde_urlencoded::to_string(&data)?;
 
-    let req = REQ
+    let req = CLIENT
         .post("https://auth.tidal.com/v1/oauth2/token")
         .body(body)
         .basic_auth(client_id, Some(client_secret))
@@ -113,7 +113,7 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
         ..Default::default()
     };
     let body = serde_urlencoded::to_string(&data)?;
-    let req = REQ
+    let req = CLIENT
         .post(format!("{}/token", &AUTH_BASE))
         .basic_auth(client_id, Some(client_secret))
         .body(body)
@@ -133,7 +133,7 @@ pub async fn check_auth_status(device_code: &str) -> Result<RefreshResponse, Err
 
 pub async fn logout() -> Result<(), Error> {
     let token = get_auth_token().await?;
-    let _ = REQ
+    let _ = CLIENT
         .post("https://api.tidal.com/v1/logout")
         .bearer_auth(token)
         .send()

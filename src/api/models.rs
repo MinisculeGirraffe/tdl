@@ -7,7 +7,7 @@ use tabled::Tabled;
 pub struct RefreshResponse {
     pub user: UserResponse,
     pub access_token: String,
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
     pub token_type: String,
     pub expires_in: i64,
 }

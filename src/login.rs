@@ -5,6 +5,7 @@ use crate::api::models::DeviceAuthResponse;
 use crate::config::CONFIG;
 use anyhow::Error;
 use indicatif::TermLike;
+use log::debug;
 use tokio::task::JoinHandle;
 
 use console::{measure_text_width, Emoji, Term};
@@ -29,7 +30,7 @@ pub async fn login_web() -> Result<bool, Error> {
         let login_results = login?;
         config.login_key.device_code = Some(code.device_code);
         config.login_key.access_token = Some(login_results.access_token);
-        config.login_key.refresh_token = Some(login_results.refresh_token);
+        config.login_key.refresh_token = login_results.refresh_token;
         config.login_key.expires_after = Some(login_results.expires_in + timestamp);
         config.login_key.user_id = Some(login_results.user.user_id);
         config.login_key.country_code = Some(login_results.user.country_code);
@@ -42,8 +43,9 @@ pub async fn login_web() -> Result<bool, Error> {
 }
 
 pub async fn login_config() -> Result<bool, Error> {
-    let mut config = CONFIG.write().await;
+    let config = CONFIG.read().await;
     if let Some(access_token) = config.login_key.access_token.as_ref() {
+        debug!("Attempting to validate access token");
         if verify_access_token(access_token).await? {
             println!("Access Token Valid");
             return Ok(true);
@@ -51,16 +53,22 @@ pub async fn login_config() -> Result<bool, Error> {
     }
 
     if let Some(refresh_token) = config.login_key.refresh_token.as_ref() {
+        debug!("Attempting to refresh access token");
         let refresh = refresh_access_token(refresh_token).await?;
+        drop(config);
+        debug!("Access token refreshed");
         let now = chrono::Utc::now().timestamp();
-        config.login_key.expires_after = Some(refresh.expires_in + now);
-        config.login_key.access_token = Some(refresh.access_token);
-        config.login_key.refresh_token = Some(refresh.refresh_token);
-        config.save()?;
-        println!("Access Token Refreshed with Refresh Token");
-        return Ok(true);
+        {
+            let mut config = CONFIG.write().await;
+            config.login_key.expires_after = Some(refresh.expires_in + now);
+            config.login_key.access_token = Some(refresh.access_token);
+            debug!("Attempting to save access token");
+            config.save()?;
+            println!("Access Token Refreshed with Refresh Token");
+            return Ok(true);
+        }
     }
-
+    debug!("All methods failed");
     Err(Error::msg(
         "Unable to authenticate with both client and refresh token",
     ))
