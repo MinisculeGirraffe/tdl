@@ -20,7 +20,7 @@ use std::str::FromStr;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
-use tokio_util::io::StreamReader;
+
 async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<bool, Error> {
     let info = track.get_info();
     let pb = ProgressBar::new(mp, track.id);
@@ -34,19 +34,20 @@ async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<
 
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
     let file = File::create(dl_path).await?;
+
+    //1 MiB Write buffer to minimize syscalls for slow i/o
+    //Reduces write CPU time from 24% to 7% of CPU time.
+    let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000, file);
     let mut downloaded: u64 = 0;
-    let stream = response.bytes_stream().map(|i| {
-        let chunk = i.unwrap();
+    let mut stream = response.bytes_stream();
+    while let Some(item) = stream.next().await {
+        let chunk = item?;
         downloaded = min(downloaded + (chunk.len() as u64), total_size);
+        writer.write_all(&chunk).await?;
         pb.set_position(downloaded);
-        tokio::io::Result::Ok(chunk)
-    });
-    let mut stream_reader = StreamReader::new(stream);
-    let buff_capacity = 1024 * 1000 * 1000; // 1Mib
-    let mut buff_writer = tokio::io::BufWriter::with_capacity(buff_capacity, file);
-    tokio::io::copy(&mut stream_reader, &mut buff_writer).await?;
+    }
     //flush buffer to disk;
-    buff_writer.flush().await?;
+    writer.flush().await?;
     write_metadata(track, dl_path).await?;
     pb.println(format!("Download Complete | {info}"));
     Ok(true)
