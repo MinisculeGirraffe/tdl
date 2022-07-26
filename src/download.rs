@@ -35,9 +35,9 @@ async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
     let file = File::create(dl_path).await?;
 
-    //5 MiB Write buffer to minimize syscalls for slow i/o
+    //1 MiB Write buffer to minimize syscalls for slow i/o
     //Reduces write CPU time from 24% to 7% of CPU time.
-    let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000 * 5, file);
+    let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000, file);
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
     while let Some(item) = stream.next().await {
