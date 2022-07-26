@@ -25,6 +25,7 @@ Benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink.
 
 #### Download files (Multi/Single Threaded):
 
+tdl get https://tidal.com/browse/artist/5416094 -w 1 -d 3  7.25s user 9.75s system 25% cpu 1:06.83 total
 
 #### Legend
 - `real`: The actual time spent in running the process from start to finish, as if it was measured by a human with a stopwatch

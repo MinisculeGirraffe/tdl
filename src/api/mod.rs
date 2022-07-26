@@ -25,10 +25,12 @@ lazy_static::lazy_static! {
     pub static ref REQ: ClientWithMiddleware  = ClientBuilder::new(CLIENT.clone())
     .with(
         RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder()
-            .backoff_exponent(2)
-            .build_with_max_retries(5)
-        )
+         ExponentialBackoff {
+            max_n_retries: 5,
+            max_retry_interval: std::time::Duration::from_millis(1000),
+            min_retry_interval: std::time::Duration::from_millis(2000),
+            backoff_exponent: 2,
+         })
     )
     .build();
 }
