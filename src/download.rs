@@ -48,12 +48,12 @@ async fn download_file(track: Track, mp: MultiProgress, path: String) -> Result<
     }
 
     //flush buffer to disk;
-    //but don't do it in this thread so we can start downloading the next file
+    //but don't do it in this thread so we can start downloading the next file right away
     tokio::task::spawn(async move {
         pb.set_message(format!("Writing to Disk | {info}"));
-        writer.flush().await;
+        writer.flush().await.ok();
         pb.set_message(format!("Writing metadata | {info}"));
-        write_metadata(track, path).await;
+        write_metadata(track, path).await.ok();
         pb.println(format!("Download Complete | {info}"));
     });
 

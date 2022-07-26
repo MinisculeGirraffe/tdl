@@ -39,7 +39,7 @@ impl ProgressBar {
         self.0
             .set_message(format!("Downloading File | {}", track.get_info()));
     }
-    pub fn set_message (&self,message: String) {
+    pub fn set_message(&self, message: String) {
         self.0.set_message(message)
     }
     pub fn println(&self, s: impl ToString) {
