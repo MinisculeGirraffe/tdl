@@ -7,33 +7,48 @@ tdl offers significant performance improvements over the original python script 
 
 ## Usage
 
-- Get a single item
+### Getting Started
+
+To setup an auth token, run the below command, and log in via the link output to the terminal
+
+```
+tdl login
+```
+
+To get the possible parameters for any command or sub command, run:
+
+```
+tdl --help
+tdl get --help
+```
+
+### Get
+
+Get a single item
+
 ```
 tdl get <URL>
 tdl get https://tidal.com/browse/album/129835816
 ```
 
-- Get multiple items
+Get multiple items
 ```
 tdl get <URL1> <URL2> 
 tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/147102710  
 ```
 
-### Benchmarks
+### Search
 
-Benchmarks were performed on a Linode Nanode 1GB with a 40gbps downlink.
 
-#### Download files (Multi/Single Threaded):
 
-tdl get https://tidal.com/browse/artist/5416094 -w 1 -d 3  7.25s user 9.75s system 25% cpu 1:06.83 total
+### Autocomplete
 
-#### Legend
-- `real`: The actual time spent in running the process from start to finish, as if it was measured by a human with a stopwatch
-- `user`: The cumulative time spent by all the CPUs during the computation. Time spent waiting for I/O does not count towards this counter
-- `sys`: The cumulative time spent by all the CPUs during system-related tasks such as memory allocation.
-- `real speedup`: Multiplier of total time saved.
-- `user speedup`: Multiplier of total CPU time saved. 
+tdl will generate an autocompletion file for various shells, that can be output to the proper autocomplete directory on your system
 
+Example:
+```
+tdl autocomplete -s zsh > $FPATH/tdl.zsh
+```
 
 ## Config Setup
 

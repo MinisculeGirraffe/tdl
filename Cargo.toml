@@ -7,8 +7,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "3.2.8"
+clap = "3.2.15"
+clap_complete = "3.2.3"
+clap_complete_fig = "3.2.4"
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1.9"
+reqwest-middleware = "0.1.6"
+reqwest-retry = "0.1.5"
 reqwest = { version = "0.11.11", features = [
     "json",
     "rustls-tls",
@@ -24,19 +29,17 @@ lazy_static = "1.4.0"
 toml = "0.5.9"
 chrono = "0.4.19"
 base64 = "0.13.0"
-shellexpand = "2.1.0"
 regex = "1.6.0"
 metaflac = "0.2.5"
 log = "0.4.17"
 env_logger = "0.9.0"
-sanitize-filename = "0.4.0"
+shellexpand = "2.1.0"
 futures = "0.3.21"
 indicatif = "0.17.0-rc.11"
 console = "0.15.0"
 tabled = "0.8.0"
-tokio-stream = "0.1.9"
-reqwest-middleware = "0.1.6"
-reqwest-retry = "0.1.5"
+sanitize-filename = "0.4.0"
+
 
 [dependencies.serde_with]
 version = "1.14.0"

@@ -207,8 +207,8 @@ async fn get_path(track: &Track) -> Result<String, Error> {
 }
 
 async fn write_metadata(track: Track, path: String) -> Result<(), Error> {
-    let path = Path::new(&path);
-    let mut tag = Tag::read_from_path(path)?;
+    let mut tag =
+        tokio::task::spawn_blocking(move || Tag::read_from_path(Path::new(&path))).await??;
     tag.set_vorbis("TITLE", vec![track.title]);
     tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
     tag.set_vorbis("ARTIST", vec![track.artist.name]);
@@ -220,7 +220,7 @@ async fn write_metadata(track: Track, path: String) -> Result<(), Error> {
         tag.add_picture(cover.content_type, CoverFront, cover.data);
     }
 
-    tag.save()?;
+    tokio::task::spawn_blocking(move || tag.save()).await??;
     info!("Metadata written to file");
     Ok(())
 }

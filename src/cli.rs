@@ -1,3 +1,4 @@
+use crate::{api::models::AudioQuality, config::CONFIG};
 use clap::{
     arg,
     builder::{
@@ -6,8 +7,7 @@ use clap::{
     },
     value_parser, Arg, ArgMatches, Command,
 };
-
-use crate::{api::models::AudioQuality, config::CONFIG};
+use clap_complete::Shell;
 
 pub fn cli() -> Command<'static> {
     Command::new(env!("CARGO_PKG_NAME"))
@@ -23,6 +23,7 @@ pub fn cli() -> Command<'static> {
         .subcommand(
             Command::new("logout").about("Logout via the TIDAL API and resets the login config"),
         )
+        .subcommand(autocomplete())
 }
 
 fn get() -> Command<'static> {
@@ -121,6 +122,27 @@ fn search() -> Command<'static> {
                 .value_parser(value_parser!(u32))
                 .value_name("number")
                 .help("Maximum number of items to return"),
+        )
+}
+
+fn autocomplete() -> Command<'static> {
+    Command::new("autocomplete")
+        .arg(
+            Arg::new("shell")
+                .short('s')
+                .long("shell")
+                .value_parser(EnumValueParser::<Shell>::new())
+                .required(true)
+                .takes_value(true)
+                .allow_invalid_utf8(true)
+                .help("Print Shell completions to stdout for the specified shell"),
+        )
+        .arg(
+            Arg::new("fig")
+                .conflicts_with("shell")
+                .short('f')
+                .long("fig")
+                .help("Print Fig Autocompletion Spec"),
         )
 }
 

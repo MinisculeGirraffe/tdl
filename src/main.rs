@@ -5,6 +5,7 @@ mod download;
 mod login;
 mod models;
 
+use std::io;
 use std::pin::Pin;
 
 use crate::config::CONFIG;
@@ -15,6 +16,8 @@ use api::auth::logout;
 use api::models::{Album, Artist, Track};
 use api::search::search_content;
 use clap::ArgMatches;
+use clap_complete::{generate, Shell};
+use clap_complete_fig::Fig;
 use cli::{cli, parse_config_flags};
 use download::dispatch_downloads;
 use env_logger::Env;
@@ -37,6 +40,7 @@ async fn main() {
         Some(("search", search_matches)) => search(search_matches).await,
         Some(("login", _)) => login().await,
         Some(("logout", _)) => logout().await.unwrap(),
+        Some(("autocomplete", matches)) => autocomplete(matches),
         _ => unreachable!(), // If all subcommands are defined above, anything else is unreachable!()
     }
 }
@@ -106,4 +110,20 @@ pub async fn login() {
     }
 
     panic!("All Login methods failed")
+}
+
+fn autocomplete(matches: &ArgMatches) {
+    let mut cmd = cli();
+    if let Some(shell) = matches.get_one::<Shell>("shell") {
+        generate(
+            shell.to_owned(),
+            &mut cmd,
+            env!("CARGO_PKG_NAME"),
+            &mut io::stdout(),
+        )
+    }
+
+    if matches.contains_id("fig") {
+        generate(Fig, &mut cmd, env!("CARGO_PKG_NAME"), &mut io::stdout())
+    }
 }
