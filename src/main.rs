@@ -70,10 +70,10 @@ async fn consume_channel(channel: ReceiveChannel, concurrency: usize) {
                 Ok(l) => match l {
                     Ok(_) => {}
                     //if the task failed
-                    Err(f) => panic!("{f}"),
+                    Err(f) => eprintln!("{f}"),
                 },
                 // if we failed to launch the task
-                Err(e) => panic!("{e}"),
+                Err(e) => eprintln!("{e}"),
             }
         })
         .await;
