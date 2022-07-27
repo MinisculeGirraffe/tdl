@@ -134,7 +134,7 @@ fn fmt_login(uri: &str) -> String {
 // formats a clickable hyperlink in a terminal
 // https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
 // https://en.wikipedia.org/wiki/ANSI_escape_code
-fn fmt_ansi_url(display: &str, url: &str) -> String {
+fn _fmt_ansi_url(display: &str, url: &str) -> String {
     format!("\x1b]8;;{}\x1b\\{}\x1b]8;;\x1b", display, url)
 }
 
