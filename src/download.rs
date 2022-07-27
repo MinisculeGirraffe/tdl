@@ -9,7 +9,7 @@ use clap::parser::ValuesRef;
 use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressDrawTarget};
 use lazy_static::lazy_static;
-use log::info;
+use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
 use regex::{Captures, Regex};
@@ -35,7 +35,7 @@ async fn download_file(
         .content_length()
         .ok_or_else(|| anyhow!("Failed to get content length from {}", stream_url))?;
     pb.start_download(total_size, &track);
-
+    debug!("Got Content Length: {total_size} for {}", track.get_info());
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
     let file = File::create(dl_path).await?;
 
@@ -52,14 +52,12 @@ async fn download_file(
     }
 
     //flush buffer to disk;
-    //but don't do it in this thread so we can start downloading the next file right away
-    tokio::task::spawn(async move {
-        pb.set_message(format!("Writing to Disk | {info}"));
-        writer.flush().await.ok();
-        pb.set_message(format!("Writing metadata | {info}"));
-        write_metadata(track, path).await.ok();
-        pb.println(format!("Download Complete | {info}"));
-    });
+    pb.set_message(format!("Writing to Disk | {info}"));
+    writer.flush().await?;
+
+    pb.set_message(format!("Writing metadata | {info}"));
+    write_metadata(track, path).await.ok();
+    pb.println(format!("Download Complete | {info}"));
 
     Ok(true)
 }

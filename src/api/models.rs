@@ -173,7 +173,6 @@ pub struct Track {
     pub volume_number: usize,
     #[tabled(skip)]
     pub track_number_on_playlist: Option<usize>,
-    #[tabled(skip)]
     pub isrc: String,
     pub explicit: bool,
     pub audio_quality: AudioQuality,
