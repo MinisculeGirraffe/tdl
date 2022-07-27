@@ -37,9 +37,6 @@ tdl get <URL1> <URL2>
 tdl get https://tidal.com/browse/album/129835816 https://tidal.com/browse/album/147102710  
 ```
 
-### Search
-
-
 
 ### Autocomplete
 
@@ -106,7 +103,7 @@ Example Values:
 
 ### Concurrency
 
-- `concurrency`
+- `downloads`
     - Number of concurrent downloads. Not recommended to set higher than 8.
     - Default:
         - `3`
