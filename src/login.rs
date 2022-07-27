@@ -124,11 +124,10 @@ fn hide_prompt(task: JoinHandle<()>) {
 fn fmt_login(uri: &str) -> String {
     let url = format!("https://{}", uri);
     // ANSI Hyperlink format.
-    let hyperlink = fmt_ansi_url(&url, &url);
-
+    
     format!(
         "Please Login to Tidal: {}",
-        style(hyperlink).underlined().bold()
+        style(url).underlined().bold()
     )
 }
 
