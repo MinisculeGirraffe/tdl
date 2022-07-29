@@ -62,9 +62,9 @@ async fn download_file(
     Ok(true)
 }
 
-async fn download_track(id: usize, task: DownloadTask) -> Result<bool, Error> {
+async fn download_track(id: String, task: DownloadTask) -> Result<bool, Error> {
     let config = CONFIG.read().await;
-    let track = get_track(id).await?;
+    let track = get_track(&id).await?;
     let path_str = get_path(&track).await?;
     if config.download_cover {
         //spawn a green thread as to not block the current download
@@ -91,32 +91,29 @@ async fn download_track(id: usize, task: DownloadTask) -> Result<bool, Error> {
     }
 }
 
-async fn download_album(id: usize, task: DownloadTask) -> Result<bool, Error> {
-    let url = format!("https://api.tidal.com/v1/albums/{}/items", id);
+async fn download_list(kind: ActionKind, id: String, task: DownloadTask) -> Result<bool, Error> {
+    let url = format!("https://api.tidal.com/v1/{kind}s/{id}/items",);
     let tracks = get_items::<ItemResponseItem<Track>>(&url, None, None).await?;
     for track in tracks {
         task.progress
             .println(format!("Getting Track Info for: {}", track.item.get_info()))?;
-        match task
-            .worker_channel
-            .send(Box::pin(download_track(track.item.id, task.clone())))
-            .await
-        {
+        let future = Box::pin(download_track(track.item.id.to_string(), task.clone()));
+        match task.worker_channel.send(future).await {
             Ok(_) => continue,
             Err(_) => return Err(anyhow!("Error Submitting download_track")),
         }
     }
     Ok(true)
 }
-async fn download_artist(id: usize, task: DownloadTask) -> Result<bool, Error> {
+async fn download_artist(id: String, task: DownloadTask) -> Result<bool, Error> {
     task.progress.println("Getting Artist Albums")?;
-    let albums = get_album_items(id).await?;
+    let albums = get_album_items(&id).await?;
     for album in albums {
         task.progress.println(format!(
             "Getting Tracks for Album: {}",
             album.title.unwrap_or_else(|| "".into())
         ))?;
-        download_album(album.id, task.clone()).await?;
+        download_list(ActionKind::Album, album.id.to_string(), task.clone()).await?;
     }
     Ok(true)
 }
@@ -158,15 +155,15 @@ pub async fn dispatch_downloads(
                         Err(_) => Err(anyhow!("Error submitting track to worker queue")),
                     }
                 }
-                ActionKind::Album => download_album(id, task).await,
+                ActionKind::Album => download_list(ActionKind::Album, id, task).await,
                 ActionKind::Artist => download_artist(id, task).await,
+                ActionKind::Playlist => download_list(ActionKind::Playlist, id, task).await,
             };
             match res {
                 Ok(_) => {}
                 Err(e) => eprint!("{e}"),
             };
-        })
-        .await?;
+        });
     }
 
     Ok((dl_rx, worker_rx))

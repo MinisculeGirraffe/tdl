@@ -54,7 +54,7 @@ impl ProgressBar {
 #[derive(Debug)]
 pub struct Action {
     pub kind: ActionKind,
-    pub id: usize,
+    pub id: String,
 }
 impl FromStr for Action {
     type Err = Error;
@@ -63,7 +63,7 @@ impl FromStr for Action {
         let [kind, id]: [_; 2] = url_parts[url_parts.len() - 2..].try_into()?;
         Ok(Self {
             kind: ActionKind::from_str(kind)?,
-            id: usize::from_str(id)?,
+            id: id.into(),
         })
     }
 }
@@ -72,6 +72,7 @@ pub enum ActionKind {
     Track,
     Album,
     Artist,
+    Playlist,
 }
 impl FromStr for ActionKind {
     type Err = Error;
@@ -80,6 +81,7 @@ impl FromStr for ActionKind {
             "track" => Ok(ActionKind::Track),
             "album" => Ok(ActionKind::Album),
             "artist" => Ok(ActionKind::Artist),
+            "playlist" => Ok(ActionKind::Playlist),
             _ => Err(Error::msg("No action kind for type")),
         }
     }
@@ -91,6 +93,7 @@ impl fmt::Display for ActionKind {
             ActionKind::Track => "track",
             ActionKind::Album => "album",
             ActionKind::Artist => "artist",
+            ActionKind::Playlist => "playlist",
         };
         fmt.write_str(str)?;
         Ok(())

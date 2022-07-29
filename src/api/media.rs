@@ -7,7 +7,7 @@ use anyhow::Error;
 use std::str::FromStr;
 use tokio::try_join;
 
-pub async fn get_track(id: usize) -> Result<Track, Error> {
+pub async fn get_track(id: &str) -> Result<Track, Error> {
     let (token, country_code) = get_api_param().await?;
     let url = format!("{}/tracks/{}", API_BASE, id);
 
@@ -56,7 +56,7 @@ pub fn get_cover_url(id: &str, width: usize, height: usize) -> String {
     )
 }
 
-pub async fn get_album_items(id: usize) -> Result<Vec<Album>, Error> {
+pub async fn get_album_items(id: &str) -> Result<Vec<Album>, Error> {
     let config = CONFIG.read().await;
     let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
     let mut albums: Vec<Album> = Vec::new();
