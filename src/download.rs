@@ -69,7 +69,9 @@ async fn download_track(id: usize, task: DownloadTask) -> Result<bool, Error> {
     if config.download_cover {
         //spawn a green thread as to not block the current download
         //failure doesn't really matter so result is unchecked
-        tokio::task::spawn(download_cover(track.to_owned(), path_str.to_owned()));
+        tokio::task::spawn(download_cover(track.to_owned(), path_str.to_owned()))
+            .await
+            .ok();
     }
     let dl_path = Path::new(&path_str);
     if dl_path.exists() {
@@ -119,7 +121,9 @@ async fn download_artist(id: usize, task: DownloadTask) -> Result<bool, Error> {
     Ok(true)
 }
 
-pub async fn dispatch_downloads(urls: ValuesRef<'_, String>) -> (ReceiveChannel, ReceiveChannel) {
+pub async fn dispatch_downloads(
+    urls: ValuesRef<'_, String>,
+) -> Result<(ReceiveChannel, ReceiveChannel), Error> {
     let config = CONFIG.read().await;
     let progress = setup_multi_progress(config.show_progress, config.progress_refresh_rate);
 
@@ -161,10 +165,11 @@ pub async fn dispatch_downloads(urls: ValuesRef<'_, String>) -> (ReceiveChannel,
                 Ok(_) => {}
                 Err(e) => eprint!("{e}"),
             };
-        });
+        })
+        .await?;
     }
 
-    (dl_rx, worker_rx)
+    Ok((dl_rx, worker_rx))
 }
 
 //Compile the regex once per invocation

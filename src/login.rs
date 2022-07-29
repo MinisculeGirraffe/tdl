@@ -15,7 +15,7 @@ use tokio::time::{interval, sleep, Duration, Instant};
 pub async fn login_web() -> Result<bool, Error> {
     let code = get_device_code().await?;
     let now = Instant::now();
-    let prompt = show_prompt(code.clone(), now);
+    let prompt = show_prompt(code.clone(), now).await?;
 
     while now.elapsed().as_secs() <= code.expires_in {
         let login = check_auth_status(&code.device_code).await;
@@ -74,7 +74,7 @@ pub async fn login_config() -> Result<bool, Error> {
     ))
 }
 
-fn show_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandle<()> {
+async fn show_prompt(code: DeviceAuthResponse, instant: Instant) -> Result<JoinHandle<()>, Error> {
     tokio::task::spawn(async move {
         let clocks = vec![
             "🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚",
@@ -114,6 +114,7 @@ fn show_prompt(code: DeviceAuthResponse, instant: Instant) -> JoinHandle<()> {
             }
         }
     })
+    .await?
 }
 
 fn hide_prompt(task: JoinHandle<()>) {

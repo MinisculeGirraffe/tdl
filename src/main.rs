@@ -49,7 +49,9 @@ async fn get(matches: &ArgMatches) {
     login().await;
     parse_config_flags(matches).await;
     if let Some(urls) = matches.get_many::<String>("URL") {
-        let (download, worker) = dispatch_downloads(urls).await;
+        let (download, worker) = dispatch_downloads(urls)
+            .await
+            .expect("Unable to dispatch download thread");
         let config = CONFIG.read().await;
         join!(
             consume_channel(download, config.downloads.into(),),
