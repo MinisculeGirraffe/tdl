@@ -31,7 +31,7 @@ async fn download_file(
     let playback_manifest = get_stream_url(track.id).await?;
 
     let track_path = format!(
-        "{path}.{}",
+        "{path}{}",
         playback_manifest
             .get_file_extension()
             .expect("Unable to determine track file extension")
