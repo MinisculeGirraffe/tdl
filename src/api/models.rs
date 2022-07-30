@@ -247,6 +247,17 @@ pub struct PlaybackManifest {
     pub key_id: Option<String>,
     pub urls: Vec<String>,
 }
+
+impl PlaybackManifest {
+    pub fn get_file_extension(&self) -> Option<&str> {
+        match self.mime_type.as_str() {
+            "audio/mp4" => Some(".m4a"),
+            "audio/flac" => Some(".flac"),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for PlaybackManifest {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let json = serde_json::to_string(&self).unwrap();
@@ -277,6 +288,7 @@ pub enum AudioQuality {
     Lossless,
     HiRes,
 }
+
 impl fmt::Display for AudioQuality {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let str = match self {
@@ -321,12 +333,14 @@ impl clap::ValueEnum for AudioQuality {
 pub enum AudioMode {
     Stereo,
     DolbyAtmos,
+    Sony360RA,
 }
 impl fmt::Display for AudioMode {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let str = match self {
             AudioMode::Stereo => "STEREO",
             AudioMode::DolbyAtmos => "DOLBY_ATMOS",
+            AudioMode::Sony360RA => "SONY_360RA",
         };
         fmt.write_str(str)?;
         Ok(())
@@ -339,6 +353,7 @@ impl FromStr for AudioMode {
         match input {
             "STEREO" => Ok(AudioMode::Stereo),
             "DOLBY_ATMOS" => Ok(AudioMode::DolbyAtmos),
+            "SONY_360RA" => Ok(AudioMode::Sony360RA),
             _ => Err("Error".to_string()),
         }
     }

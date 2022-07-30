@@ -98,5 +98,5 @@ fn get_config_file() -> String {
 lazy_static::lazy_static! {
    pub static ref CONFIG_HOME: String = get_config_dir();
    pub static ref CONFIG_FILE: String = get_config_file();
-   pub static ref CONFIG: RwLock<Settings> = RwLock::new(get_config().unwrap());
+   pub static ref CONFIG: RwLock<Settings> = RwLock::new(get_config().expect("Unable to get configuration"));
 }

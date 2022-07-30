@@ -1,7 +1,7 @@
 use super::{get, get_api_param, get_items, models::*};
 use super::{API_BASE, REQ};
 use crate::config::CONFIG;
-
+use anyhow::anyhow;
 use anyhow::Error;
 
 use std::str::FromStr;
@@ -11,18 +11,14 @@ pub async fn get_track(id: &str) -> Result<Track, Error> {
     let (token, country_code) = get_api_param().await?;
     let url = format!("{}/tracks/{}", API_BASE, id);
 
-    let res = get::<Track>(&url, &[country_code], &token).await?;
-
-    Ok(res)
+    get::<Track>(&url, &[country_code], &token).await
 }
 
 pub async fn get_album(id: usize) -> Result<Album, Error> {
     let (token, country_code) = get_api_param().await?;
     let url = format!("{}/albums/{}", API_BASE, id);
 
-    let res = get::<Album>(&url, &[country_code], &token).await?;
-
-    Ok(res)
+    get::<Album>(&url, &[country_code], &token).await
 }
 
 pub async fn get_stream_url(id: usize) -> Result<PlaybackManifest, Error> {
@@ -66,7 +62,7 @@ pub async fn get_album_items(id: &str) -> Result<Vec<Album>, Error> {
         let filter = vec![("filter".to_string(), "EPSANDSINGLES".to_string())];
         let singles = get_items::<Album>(&url, Some(filter), None);
         //execute the two requests concurrently
-        let results = try_join!(album_req, singles).unwrap();
+        let results = try_join!(album_req, singles)?;
 
         //add the elements to the results vec
         for mut result in [results.0, results.1] {
@@ -74,7 +70,7 @@ pub async fn get_album_items(id: &str) -> Result<Vec<Album>, Error> {
         }
     } else {
         //else execute the single request
-        albums = album_req.await.unwrap();
+        albums = album_req.await?;
     }
 
     Ok(albums)
@@ -82,13 +78,11 @@ pub async fn get_album_items(id: &str) -> Result<Vec<Album>, Error> {
 
 pub async fn get_cover_data(id: &str) -> Result<Cover, Error> {
     let req = REQ.get(get_cover_url(id, 1280, 1280)).send().await?;
-    let content_type = req
-        .headers()
-        .get("Content-Type")
-        .unwrap()
-        .to_str()?
-        .to_string();
-    let data = req.bytes().await?.to_vec();
+    let content_type = match req.headers().get("Content-Type") {
+        Some(val) => val.to_str()?.to_string(),
+        None => return Err(anyhow!("Unable to get Content Type from Request")),
+    };
 
+    let data = req.bytes().await?.to_vec();
     Ok(Cover { content_type, data })
 }

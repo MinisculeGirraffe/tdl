@@ -28,8 +28,16 @@ async fn download_file(
 ) -> Result<bool, anyhow::Error> {
     let info = track.get_info();
     let pb = ProgressBar::new(mp, track.id);
-    let dl_path = Path::new(&path);
-    let stream_url = &get_stream_url(track.id).await?.urls[0];
+    let playback_manifest = get_stream_url(track.id).await?;
+
+    let track_path = format!(
+        "{path}.{}",
+        playback_manifest
+            .get_file_extension()
+            .expect("Unable to determine track file extension")
+    );
+    let stream_url = &playback_manifest.urls[0];
+    let dl_path = Path::new(&track_path);
     let response = REQ.get(stream_url).send().await?;
     let total_size: u64 = response
         .content_length()
@@ -38,7 +46,6 @@ async fn download_file(
     debug!("Got Content Length: {total_size} for {}", track.get_info());
     tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
     let file = File::create(dl_path).await?;
-
     // 1 MiB Write buffer to minimize syscalls for slow i/o
     // Reduces write CPU time from 24% to 7%.
     let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000, file);
@@ -202,8 +209,7 @@ async fn get_path(track: &Track) -> Result<String, Error> {
         _ => panic!("matched no tokens on download_path string"),
     });
 
-    let with_ext = format!("{}.flac", replaced);
-    Ok(with_ext)
+    Ok(replaced.to_string())
 }
 
 async fn write_metadata(track: Track, path: String) -> Result<(), Error> {
