@@ -48,9 +48,9 @@ async fn main() {
 }
 
 async fn get(matches: &ArgMatches) {
+    let client = login().await;
     parse_config_flags(matches).await;
     if let Some(urls) = matches.get_many::<String>("URL") {
-        let client = login().await;
         debug!("Login sucessful");
         let url: Vec<String> = urls.map(|i| i.to_owned()).collect();
         debug!("Collected args");

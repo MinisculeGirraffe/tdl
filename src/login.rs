@@ -90,7 +90,7 @@ pub async fn login_config(client: AuthClient) -> Result<TidalClient, Error> {
             config.login_key.expires_after = Some(refresh.expires_in + now);
             config.login_key.access_token = Some(refresh.access_token);
             debug!("Attempting to save access token");
-            config.save()?;
+            config.save().unwrap();
             println!("Access Token Refreshed with Refresh Token");
         }
 

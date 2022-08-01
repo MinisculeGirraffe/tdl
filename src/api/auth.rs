@@ -50,7 +50,7 @@ impl AuthClient {
     pub async fn verify_access_token(&self, access_token: &str) -> Result<bool, Error> {
         let req = self
             .http
-            .get(format!("{}/sessions", self.auth_base))
+            .get("https://api.tidal.com/v1/sessions")
             .bearer_auth(access_token)
             .send()
             .await?;
