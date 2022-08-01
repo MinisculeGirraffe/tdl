@@ -231,7 +231,7 @@ impl DownloadTask {
         let dl_path = &config.download_path;
         let shell_path = shellexpand::full(&dl_path)?;
 
-        let album = self.client.media._get_album(track.album.id).await?;
+        let album = self.client.media.get_album(track.album.id).await?;
         let album_name = album.title.as_ref().unwrap();
         let track_num_str = &track.track_number.to_string();
         let track_quality = &track.audio_quality.to_string();

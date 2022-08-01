@@ -28,7 +28,7 @@ impl MediaClient {
         self.get::<Track>(&url, None).await
     }
 
-    pub async fn _get_album(&self, id: usize) -> Result<Album, Error> {
+    pub async fn get_album(&self, id: usize) -> Result<Album, Error> {
         let url = format!("{}/albums/{}", &self.api_base, id);
         self.get::<Album>(&url, None).await
     }

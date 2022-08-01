@@ -6,6 +6,7 @@ use self::{
 };
 use crate::config::Settings;
 use anyhow::Error;
+use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache};
 use log::debug;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
@@ -21,7 +22,7 @@ use search::SearchClient;
 
 // Share reqwest client for connection pooling
 lazy_static::lazy_static! {
-    pub static ref CLIENT:ClientWithMiddleware = build_retry_client();
+    pub static ref CLIENT:Client = build_http_client();
 
 }
 
@@ -33,7 +34,7 @@ fn build_http_client() -> Client {
     .expect("Unable to build Reqwest Client")
 }
 
-fn build_retry_client() -> ClientWithMiddleware {
+fn build_middleware_client(cache_dir: String) -> ClientWithMiddleware {
     debug!("Build Request client");
 
     let reqwest = build_http_client();
@@ -43,9 +44,16 @@ fn build_retry_client() -> ClientWithMiddleware {
         min_retry_interval: std::time::Duration::from_millis(2000),
         backoff_exponent: 2,
     };
+    let cache_manager = CACacheManager { path: cache_dir };
+    let cache_policy = HttpCache {
+        mode: CacheMode::Default,
+        manager: cache_manager,
+        options: None,
+    };
 
     ClientBuilder::new(reqwest)
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .with(Cache(cache_policy))
         .build()
 }
 
@@ -82,7 +90,7 @@ impl ApiClient {
                 config.login_key.country_code.unwrap(),
             ),
             access_token: config.login_key.access_token.unwrap(),
-            http_client: build_retry_client(),
+            http_client: build_middleware_client(config.cache_dir),
             include_singles: config.include_singles,
             api_base: String::from("https://api.tidalhifi.com/v1"),
             audio_quality: config.audio_quality,
