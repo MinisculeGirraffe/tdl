@@ -8,7 +8,6 @@ use std::env::var;
 use std::io::Write;
 use tokio::sync::RwLock;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
     pub download_path: String,
