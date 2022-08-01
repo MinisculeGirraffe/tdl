@@ -1,88 +1,61 @@
-use std::pin::Pin;
-
-use crate::api::auth::AuthClient;
+use crate::api::auth::{
+    check_auth_status, get_device_code, refresh_access_token, verify_access_token,
+};
 use crate::api::models::DeviceAuthResponse;
-use crate::api::TidalClient;
 use crate::config::CONFIG;
-use anyhow::anyhow;
 use anyhow::Error;
-use console::{measure_text_width, Emoji, Term};
-use console::{pad_str, style};
-use futures::Future;
 use indicatif::TermLike;
 use log::debug;
 use tokio::task::JoinHandle;
+
+use console::{measure_text_width, Emoji, Term};
+use console::{pad_str, style};
 use tokio::time::{interval, sleep, Duration, Instant};
 
-type LoginResponse = Pin<Box<dyn Future<Output = Result<TidalClient, Error>>>>;
-
-pub async fn login() -> TidalClient {
-    let config = CONFIG.read().await;
-
-    let auth = AuthClient::new(config.api_key.clone());
-    drop(config);
-    let methods: [LoginResponse; 2] = [
-        Box::pin(login_config(auth.clone())),
-        Box::pin(login_web(auth.clone())),
-    ];
-
-    for method in methods {
-        match method.await {
-            Ok(v) => return v,
-            Err(e) => eprintln!("{e}"),
-        }
-    }
-
-    panic!("All Login methods failed")
-}
-
-pub async fn login_web(client: AuthClient) -> Result<TidalClient, Error> {
-    let code = client.get_device_code().await?;
+pub async fn login_web() -> Result<bool, Error> {
+    let code = get_device_code().await?;
     let now = Instant::now();
     let prompt = show_prompt(code.clone(), now);
 
     while now.elapsed().as_secs() <= code.expires_in {
-        let login = client.check_auth_status(&code.device_code).await;
+        let login = check_auth_status(&code.device_code).await;
         if login.is_err() {
             sleep(Duration::from_secs(code.interval)).await;
             continue;
         }
         hide_prompt(prompt);
         let timestamp = chrono::Utc::now().timestamp();
-        {
-            let mut config = CONFIG.write().await;
-            //login will not be error if this is reached.
-            let login_results = login?;
-            config.login_key.device_code = Some(code.device_code);
-            config.login_key.access_token = Some(login_results.access_token);
-            config.login_key.refresh_token = login_results.refresh_token;
-            config.login_key.expires_after = Some(login_results.expires_in + timestamp);
-            config.login_key.user_id = Some(login_results.user.user_id);
-            config.login_key.country_code = Some(login_results.user.country_code);
-            config.save()?;
-        }
-        return Ok(TidalClient::new(&*CONFIG.read().await));
+        let mut config = CONFIG.write().await;
+        //login will not be error if this is reached.
+        let login_results = login?;
+        config.login_key.device_code = Some(code.device_code);
+        config.login_key.access_token = Some(login_results.access_token);
+        config.login_key.refresh_token = login_results.refresh_token;
+        config.login_key.expires_after = Some(login_results.expires_in + timestamp);
+        config.login_key.user_id = Some(login_results.user.user_id);
+        config.login_key.country_code = Some(login_results.user.country_code);
+        config.save()?;
+        return Ok(true);
     }
     hide_prompt(prompt);
-    Err(anyhow!(
-        "Login Request timed out. Please generate a new code"
-    ))
+    println!("Login Request timed out. Please generate a new code");
+    Ok(false)
 }
 
-pub async fn login_config(client: AuthClient) -> Result<TidalClient, Error> {
+pub async fn login_config() -> Result<bool, Error> {
     let config = CONFIG.read().await;
     if let Some(access_token) = config.login_key.access_token.as_ref() {
         debug!("Attempting to validate access token");
-        if client.verify_access_token(access_token).await? {
+        if verify_access_token(access_token).await? {
             println!("Access Token Valid");
-            return Ok(TidalClient::new(&*config));
+            return Ok(true);
         }
     }
 
     if let Some(refresh_token) = config.login_key.refresh_token.as_ref() {
         debug!("Attempting to refresh access token");
-        let refresh = client.refresh_access_token(refresh_token).await?;
-        drop(config); //Drop our read lock
+        let refresh = refresh_access_token(refresh_token).await?;
+        drop(config);
         debug!("Access token refreshed");
         let now = chrono::Utc::now().timestamp();
         {
@@ -90,11 +63,10 @@ pub async fn login_config(client: AuthClient) -> Result<TidalClient, Error> {
             config.login_key.expires_after = Some(refresh.expires_in + now);
             config.login_key.access_token = Some(refresh.access_token);
             debug!("Attempting to save access token");
-            config.save().unwrap();
+            config.save()?;
             println!("Access Token Refreshed with Refresh Token");
+            return Ok(true);
         }
-
-        return Ok(TidalClient::new(&*CONFIG.read().await));
     }
     debug!("All methods failed");
     Err(Error::msg(

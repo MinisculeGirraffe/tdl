@@ -8,7 +8,7 @@ use std::env::var;
 use std::io::Write;
 use tokio::sync::RwLock;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub download_path: String,
     pub audio_quality: AudioQuality,
@@ -34,7 +34,7 @@ impl Settings {
     }
 }
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LoginKey {
     #[serde_as(as = "NoneAsEmptyString")]
     pub device_code: Option<String>,
@@ -48,7 +48,7 @@ pub struct LoginKey {
     pub expires_after: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ApiKey {
     pub client_id: String,
     pub client_secret: String,
