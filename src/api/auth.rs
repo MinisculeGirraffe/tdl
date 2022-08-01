@@ -1,18 +1,17 @@
-use std::{collections::HashMap};
+use super::build_http_client;
+use super::models::*;
+use crate::config::{ApiKey, CONFIG};
 use anyhow::anyhow;
 use anyhow::Error;
-use reqwest_middleware::ClientWithMiddleware;
-
-use super::{build_http_client, models::*,};
-use crate::config::{ApiKey,  CONFIG};
-
+use reqwest::Client;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct AuthClient {
     client_id: String,
     client_secret: String,
     auth_base: String,
-    http: ClientWithMiddleware,
+    http: Client,
 }
 
 impl AuthClient {
@@ -129,19 +128,15 @@ impl AuthClient {
             .bearer_auth(auth_token)
             .send()
             .await?;
-            
+
         if req.status() == 200 {
             Ok(())
-        }
-        else {
+        } else {
             Err(anyhow!("Failed to Logout"))
         }
-  
     }
 
     pub async fn check_auth_status(&self, device_code: &str) -> Result<RefreshResponse, Error> {
-
-
         let data = DeviceAuthRequest {
             client_id: self.client_id.clone(),
             device_code: Some(device_code.to_string()),
@@ -150,7 +145,8 @@ impl AuthClient {
             ..Default::default()
         };
         let body = serde_urlencoded::to_string(&data)?;
-        let req = self.http
+        let req = self
+            .http
             .post(format!("{}/token", self.auth_base))
             .basic_auth(self.client_id.clone(), Some(self.client_secret.clone()))
             .body(body)
@@ -167,6 +163,4 @@ impl AuthClient {
         let res = req.json::<RefreshResponse>().await?;
         Ok(res)
     }
-    
 }
-

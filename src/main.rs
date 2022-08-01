@@ -20,9 +20,10 @@ use cli::{cli, parse_config_flags};
 use download::dispatch_downloads;
 use env_logger::Env;
 use futures::future::join_all;
-use futures::{ StreamExt};
+use futures::StreamExt;
 
 use download::ReceiveChannel;
+use log::debug;
 use tokio::join;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -50,7 +51,9 @@ async fn get(matches: &ArgMatches) {
     parse_config_flags(matches).await;
     if let Some(urls) = matches.get_many::<String>("URL") {
         let client = login().await;
+        debug!("Login sucessful");
         let url: Vec<String> = urls.map(|i| i.to_owned()).collect();
+        debug!("Collected args");
         let (handles, download, worker) = dispatch_downloads(url, client)
             .await
             .expect("Unable to dispatch download thread");

@@ -7,6 +7,7 @@ use self::{
 use crate::config::Settings;
 use anyhow::Error;
 use log::debug;
+use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use serde::de::DeserializeOwned;
@@ -20,27 +21,31 @@ use search::SearchClient;
 
 // Share reqwest client for connection pooling
 lazy_static::lazy_static! {
-    pub static ref CLIENT:ClientWithMiddleware = build_http_client();
+    pub static ref CLIENT:ClientWithMiddleware = build_retry_client();
 
 }
 
-fn build_http_client() -> ClientWithMiddleware {
-    let reqwest  = reqwest::Client::builder()
-    //don't use the system openssl
+fn build_http_client() -> Client {
+    reqwest::Client::builder()
     //use the example chrome useragent from MDN Docs as tidal API's will sometimes fail without it
     .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59")
     .build()
-    .expect("Unable to build Reqwest Client");
+    .expect("Unable to build Reqwest Client")
+}
+
+fn build_retry_client() -> ClientWithMiddleware {
+    debug!("Build Request client");
+
+    let reqwest = build_http_client();
+    let retry_policy = ExponentialBackoff {
+        max_n_retries: 5,
+        max_retry_interval: std::time::Duration::from_millis(1000),
+        min_retry_interval: std::time::Duration::from_millis(2000),
+        backoff_exponent: 2,
+    };
 
     ClientBuilder::new(reqwest)
-        .with(RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff {
-                max_n_retries: 5,
-                max_retry_interval: std::time::Duration::from_millis(1000),
-                min_retry_interval: std::time::Duration::from_millis(2000),
-                backoff_exponent: 2,
-            },
-        ))
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build()
 }
 
@@ -77,7 +82,7 @@ impl ApiClient {
                 config.login_key.country_code.unwrap(),
             ),
             access_token: config.login_key.access_token.unwrap(),
-            http_client: build_http_client(),
+            http_client: build_retry_client(),
             include_singles: config.include_singles,
             api_base: String::from("https://api.tidalhifi.com/v1"),
             audio_quality: config.audio_quality,
@@ -88,15 +93,16 @@ impl ApiClient {
     where
         T: DeserializeOwned + 'a,
     {
-        let mut req = self
+        let mut params = Vec::new();
+        if let Some(query) = query {
+            params.extend(query);
+        }
+        params.push(&self.country_code);
+        let req = self
             .http_client
             .get(url)
             .bearer_auth(&self.access_token)
-            .query(&self.country_code);
-
-        if let Some(query) = query {
-            req = req.query(query)
-        }
+            .query(&params);
 
         let result = req.send().await?.text().await?;
         debug!("{}", result);

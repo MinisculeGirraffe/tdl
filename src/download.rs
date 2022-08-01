@@ -45,7 +45,7 @@ pub async fn dispatch_downloads(
         client,
         progress,
     };
-
+    debug!("Download Task");
     let mut handles = Vec::with_capacity(urls.len());
     // for every url supplied to the get command
     for url in urls {
@@ -123,14 +123,7 @@ impl DownloadTask {
 
     async fn download_track(self, id: String) -> Result<bool, Error> {
         let track = self.client.media.get_track(&id).await?;
-        let path_str = get_path(&track).await?;
-        let dl_path = Path::new(&path_str);
-        if dl_path.exists() {
-            self.progress
-                .println(format!("File Exists | {}", track.get_info()))?;
-            // Exit early if the file already exists
-            return Ok(false);
-        }
+        let path_str = self.get_path(&track).await?;
         self.progress.println(format!(
             "Submitting Track to Download Queue: {}",
             track.get_info()
@@ -153,8 +146,18 @@ impl DownloadTask {
                 .get_file_extension()
                 .expect("Unable to determine track file extension")
         );
+
         let stream_url = &playback_manifest.urls[0];
         let dl_path = Path::new(&track_path);
+
+        if dl_path.exists() {
+            debug!("Path exists");
+            self.progress
+                .println(format!("File Exists | {}", track.get_info()))?;
+            // Exit early if the file already exists
+            return Ok(false);
+        }
+
         let response = CLIENT.get(stream_url).send().await?;
         let total_size: u64 = response
             .content_length()
@@ -180,7 +183,7 @@ impl DownloadTask {
         writer.flush().await?;
 
         pb.set_message(format!("Writing metadata | {info}"));
-        self.write_metadata(track, path).await?;
+        self.write_metadata(track, track_path).await?;
         pb.println(format!("Download Complete | {info}"));
 
         Ok(true)
@@ -188,6 +191,7 @@ impl DownloadTask {
 
     async fn write_metadata(&self, track: Track, path: String) -> Result<(), Error> {
         let fp = path.clone();
+        debug!("{fp}");
         let mut tag =
             tokio::task::spawn_blocking(move || Tag::read_from_path(Path::new(&fp))).await??;
         tag.set_vorbis("TITLE", vec![track.title]);
@@ -221,42 +225,42 @@ impl DownloadTask {
         info!("Write cover to disk");
         Ok(pic)
     }
+
+    async fn get_path(&self, track: &Track) -> Result<String, Error> {
+        let config = &CONFIG.read().await;
+        let dl_path = &config.download_path;
+        let shell_path = shellexpand::full(&dl_path)?;
+
+        let album = self.client.media._get_album(track.album.id).await?;
+        let album_name = album.title.as_ref().unwrap();
+        let track_num_str = &track.track_number.to_string();
+        let track_quality = &track.audio_quality.to_string();
+        let track_id = &track.id.to_string();
+        let artist_id = &track.artist.id.to_string();
+        let album_id = &track.album.id.to_string();
+        let release = album.release_date.as_ref().unwrap();
+        let ymd: Vec<&str> = release.splitn(3, '-').collect();
+        let replaced = RE.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
+            "{artist}" => sanitize(&track.artist.name),
+            "{artist_id}" => sanitize(artist_id),
+            "{album}" => sanitize(&album_name),
+            "{album_id}" => sanitize(album_id),
+            "{track_num}" => sanitize(track_num_str),
+            "{track_name}" => sanitize(&track.title),
+            "{track_id}" => sanitize(track_id),
+            "{quality}" => sanitize(track_quality),
+            "{album_release}" => sanitize(&release),
+            "{album_release_year}" => sanitize(ymd[0]),
+            _ => panic!("matched no tokens on download_path string"),
+        });
+
+        Ok(replaced.to_string())
+    }
 }
 
 //Compile the regex once per execution
 lazy_static! {
     pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\})").unwrap();
-}
-
-async fn get_path(track: &Track) -> Result<String, Error> {
-    let config = &CONFIG.read().await;
-    let dl_path = &config.download_path;
-    let shell_path = shellexpand::full(&dl_path)?;
-
-    let album = &track.album;
-    let album_name = album.title.as_ref().unwrap();
-    let track_num_str = &track.track_number.to_string();
-    let track_quality = &track.audio_quality.to_string();
-    let track_id = &track.id.to_string();
-    let artist_id = &track.artist.id.to_string();
-    let album_id = &track.album.id.to_string();
-    let release = album.release_date.as_ref().unwrap();
-    let ymd: Vec<&str> = release.splitn(3, '-').collect();
-    let replaced = RE.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
-        "{artist}" => sanitize(&track.artist.name),
-        "{artist_id}" => sanitize(artist_id),
-        "{album}" => sanitize(&album_name),
-        "{album_id}" => sanitize(album_id),
-        "{track_num}" => sanitize(track_num_str),
-        "{track_name}" => sanitize(&track.title),
-        "{track_id}" => sanitize(track_id),
-        "{quality}" => sanitize(track_quality),
-        "{album_release}" => sanitize(&release),
-        "{album_release_year}" => sanitize(ymd[0]),
-        _ => panic!("matched no tokens on download_path string"),
-    });
-
-    Ok(replaced.to_string())
 }
 
 fn setup_multi_progress(show_progress: bool, refresh_rate: u8) -> MultiProgress {
