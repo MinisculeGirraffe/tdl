@@ -1,42 +1,18 @@
-use super::ApiClient;
 use anyhow::Error;
 use serde::de::DeserializeOwned;
-use std::{ops::Deref, sync::Arc};
-use tabled::{Table, TableIteratorExt, Tabled};
+use tabled::{Table, Tabled};
 
-pub struct SearchClient(Arc<ApiClient>);
+use super::get_items;
+use super::API_BASE;
+use tabled::TableIteratorExt;
 
-impl SearchClient {
-    pub fn new(client: Arc<ApiClient>) -> Self {
-        Self(client)
-    }
-}
+pub async fn search_content<'a, T>(url: &str, query: &str, max: Option<u32>) -> Result<Table, Error>
+where
+    T: DeserializeOwned + 'a + Tabled,
+{
+    let url = format!("{}/search/{}", API_BASE, url);
+    let query = ("query".to_string(), query.to_string());
+    let table = get_items::<T>(&url, Some(vec![query]), max).await?.table();
 
-impl Deref for SearchClient {
-    type Target = ApiClient;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl SearchClient {
-    pub async fn search_content<'a, T>(
-        &self,
-        url: &str,
-        query: &str,
-        max: Option<u32>,
-    ) -> Result<Table, Error>
-    where
-        T: DeserializeOwned + 'a + Tabled,
-    {
-        let url = format!("{}/search/{}", self.api_base, url);
-        let query = ("query".to_string(), query.to_string());
-        let table = self
-            .get_items::<T>(&url, Some(vec![query]), max)
-            .await?
-            .table();
-
-        Ok(table)
-    }
+    Ok(table)
 }

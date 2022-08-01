@@ -1,10 +1,21 @@
 use anyhow::Error;
-
+use futures::Future;
 use indicatif::{MultiProgress, ProgressStyle};
+use tokio::sync::mpsc::{Receiver, Sender};
+
+use std::{fmt, pin::Pin, str::FromStr};
 
 use crate::api::models::Track;
-use std::ops::Deref;
-use std::{fmt, str::FromStr};
+
+pub type ChannelValue = Pin<Box<dyn Future<Output = Result<bool, Error>> + Send>>;
+pub type ReceiveChannel = Receiver<ChannelValue>;
+
+#[derive(Clone)]
+pub struct DownloadTask {
+    pub progress: MultiProgress,
+    pub dl_channel: Sender<ChannelValue>,
+    pub worker_channel: Sender<ChannelValue>,
+}
 
 pub struct ProgressBar(indicatif::ProgressBar);
 
@@ -22,19 +33,21 @@ impl ProgressBar {
     }
 
     pub fn start_download(&self, length: u64, track: &Track) {
-        self.set_length(length);
-        self.set_style(ProgressStyle::default_bar()
+        self.0.set_length(length);
+        self.0.set_style(ProgressStyle::default_bar()
                         .template("{msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})").unwrap()
                         .progress_chars("#>-"));
-        self.set_message(format!("Downloading File | {}", track.get_info()));
+        self.0
+            .set_message(format!("Downloading File | {}", track.get_info()));
     }
-}
-
-impl Deref for ProgressBar {
-    type Target = indicatif::ProgressBar;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn set_message(&self, message: String) {
+        self.0.set_message(message)
+    }
+    pub fn println(&self, s: impl ToString) {
+        let _ = &self.0.println(s.to_string());
+    }
+    pub fn set_position(&self, i: u64) {
+        let _ = &self.0.set_position(i);
     }
 }
 

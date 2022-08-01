@@ -1,149 +1,118 @@
-use std::sync::Arc;
-
-use self::{
-    media::MediaClient,
-    models::{AudioQuality, ItemResponse},
-};
-use crate::config::Settings;
+use crate::config::CONFIG;
 use anyhow::Error;
 use log::debug;
-use reqwest::Client;
-use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use serde::de::DeserializeOwned;
+
+use self::models::ItemResponse;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 
 pub mod auth;
 pub mod media;
 pub mod models;
-mod search;
-
-use search::SearchClient;
+pub mod search;
+static API_BASE: &str = "https://api.tidalhifi.com/v1";
+static AUTH_BASE: &str = "https://auth.tidal.com/v1/oauth2";
 
 // Share reqwest client for connection pooling
 lazy_static::lazy_static! {
-    pub static ref CLIENT:ClientWithMiddleware = build_retry_client();
-
-}
-
-fn build_http_client() -> Client {
-    reqwest::Client::builder()
+    pub static ref CLIENT: reqwest::Client = reqwest::Client::builder()
+    //don't use the system openssl
     //use the example chrome useragent from MDN Docs as tidal API's will sometimes fail without it
     .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59")
     .build()
-    .expect("Unable to build Reqwest Client")
+    .expect("Unable to build Reqwest Client");
+
+    pub static ref REQ: ClientWithMiddleware  = ClientBuilder::new(CLIENT.clone())
+    .with(
+        RetryTransientMiddleware::new_with_policy(
+         ExponentialBackoff {
+            max_n_retries: 5,
+            max_retry_interval: std::time::Duration::from_millis(1000),
+            min_retry_interval: std::time::Duration::from_millis(2000),
+            backoff_exponent: 2,
+         })
+    )
+    .build();
 }
 
-fn build_retry_client() -> ClientWithMiddleware {
-    debug!("Build Request client");
+async fn get<'a, T>(url: &'a str, query: &[(String, String)], auth: &'a String) -> Result<T, Error>
+where
+    T: DeserializeOwned + 'a,
+{
+    let req = REQ
+        .get(url)
+        .bearer_auth(auth)
+        .query(&query)
+        .send()
+        .await?
+        .text()
+        .await?;
 
-    let reqwest = build_http_client();
-    let retry_policy = ExponentialBackoff {
-        max_n_retries: 5,
-        max_retry_interval: std::time::Duration::from_millis(1000),
-        min_retry_interval: std::time::Duration::from_millis(2000),
-        backoff_exponent: 2,
-    };
+    debug!("{}", req);
+    let result = serde_json::from_str::<T>(&req)?;
 
-    ClientBuilder::new(reqwest)
-        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-        .build()
+    Ok(result)
 }
 
-pub struct TidalClient {
-    pub search: SearchClient,
-    pub media: MediaClient,
-}
-
-impl TidalClient {
-    pub fn new(config: &Settings) -> Self {
-        let api_client = ApiClient::new(config.clone());
-        Self {
-            search: SearchClient::new(api_client.clone()),
-            media: MediaClient::new(api_client),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ApiClient {
-    country_code: (String, String),
-    access_token: String,
-    audio_quality: AudioQuality,
-    include_singles: bool,
-    api_base: String,
-    http_client: ClientWithMiddleware,
-}
-
-impl ApiClient {
-    fn new(config: Settings) -> Arc<Self> {
-        Arc::new(Self {
-            country_code: (
-                String::from("countryCode"),
-                config.login_key.country_code.unwrap(),
-            ),
-            access_token: config.login_key.access_token.unwrap(),
-            http_client: build_retry_client(),
-            include_singles: config.include_singles,
-            api_base: String::from("https://api.tidalhifi.com/v1"),
-            audio_quality: config.audio_quality,
-        })
+pub async fn get_items<'a, T>(
+    url: &str,
+    opts: Option<Vec<(String, String)>>,
+    max: Option<u32>,
+) -> Result<Vec<T>, Error>
+where
+    T: DeserializeOwned + 'a,
+{
+    let (token, country_code) = get_api_param().await?;
+    let mut limit = 50;
+    let mut offset = 0;
+    let max = max.unwrap_or(u32::MAX);
+    let mut params = vec![
+        ("limit".to_string(), limit.to_string()),
+        ("offset".to_string(), offset.to_string()),
+        country_code,
+    ];
+    if let Some(opt) = opts {
+        params.extend(opt);
     }
 
-    async fn get<'a, T>(&self, url: &'a str, query: Option<&[(String, String)]>) -> Result<T, Error>
-    where
-        T: DeserializeOwned + 'a,
-    {
-        let mut params = Vec::new();
-        if let Some(query) = query {
-            params.extend(query);
-        }
-        params.push(&self.country_code);
-        let req = self
-            .http_client
-            .get(url)
-            .bearer_auth(&self.access_token)
-            .query(&params);
-
-        let result = req.send().await?.text().await?;
-        debug!("{}", result);
-        let result = serde_json::from_str::<T>(&result)?;
-        Ok(result)
-    }
-
-    pub async fn get_items<'a, T>(
-        &self,
-        url: &str,
-        opts: Option<Vec<(String, String)>>,
-        max: Option<u32>,
-    ) -> Result<Vec<T>, Error>
-    where
-        T: DeserializeOwned + 'a,
-    {
-        let mut limit = 50;
-        let mut offset = 0;
-        let max = max.unwrap_or(u32::MAX);
-        let mut params = vec![
-            ("limit".to_string(), limit.to_string()),
-            ("offset".to_string(), offset.to_string()),
-        ];
-        if let Some(opt) = opts {
-            params.extend(opt);
-        }
-
-        let mut result: Vec<T> = Vec::new();
-        'req: loop {
-            let json = self.get::<ItemResponse<T>>(url, Some(&params)).await?;
-            limit = json.limit;
-            // the minimum between the items in the response, and the total number of items requested
-            let item_limit = u32::min(json.total_number_of_items, max);
-            for item in json.items {
-                if result.len() as u32 >= item_limit {
-                    break 'req;
-                }
-                result.push(item);
+    let mut result: Vec<T> = Vec::new();
+    'req: loop {
+        let json = get::<ItemResponse<T>>(url, &params, &token).await?;
+        limit = json.limit;
+        // the minimum between the items in the response, and the total number of items requested
+        let item_limit = u32::min(json.total_number_of_items, max);
+        for item in json.items {
+            if result.len() as u32 >= item_limit {
+                break 'req;
             }
-            offset += limit;
+            result.push(item);
         }
-        Ok(result)
+        offset += limit;
     }
+    Ok(result)
+}
+
+async fn get_api_param() -> Result<(String, (String, String)), Error> {
+    Ok((get_auth_token().await?, get_country_code().await?))
+}
+
+async fn get_auth_token() -> Result<String, Error> {
+    let config = CONFIG.read().await;
+    config
+        .login_key
+        .access_token
+        .clone()
+        .ok_or_else(|| Error::msg("Missing Auth Token"))
+}
+
+async fn get_country_code() -> Result<(String, String), Error> {
+    let config = CONFIG.read().await;
+    let country = config
+        .login_key
+        .country_code
+        .clone()
+        .ok_or_else(|| Error::msg("Missing Auth Token"))?;
+
+    Ok((String::from("countryCode"), country))
 }

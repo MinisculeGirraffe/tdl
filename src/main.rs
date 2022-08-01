@@ -6,24 +6,24 @@ mod login;
 mod models;
 
 use std::io;
+use std::pin::Pin;
 
 use crate::config::CONFIG;
 use crate::login::*;
 
-use api::auth::AuthClient;
+use anyhow::Error;
+use api::auth::logout;
 use api::models::{Album, Artist, Track};
-
+use api::search::search_content;
 use clap::ArgMatches;
 use clap_complete::{generate, Shell};
 use clap_complete_fig::Fig;
 use cli::{cli, parse_config_flags};
 use download::dispatch_downloads;
 use env_logger::Env;
-use futures::future::join_all;
-use futures::StreamExt;
+use futures::{Future, StreamExt};
 
-use download::ReceiveChannel;
-use log::debug;
+use models::ReceiveChannel;
 use tokio::join;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -38,28 +38,22 @@ async fn main() {
     match matches.subcommand() {
         Some(("get", get_matches)) => get(get_matches).await,
         Some(("search", search_matches)) => search(search_matches).await,
-        Some(("login", _)) => {
-            login().await;
-        }
-        Some(("logout", _)) => logout().await,
+        Some(("login", _)) => login().await,
+        Some(("logout", _)) => logout().await.unwrap(),
         Some(("autocomplete", matches)) => autocomplete(matches),
         _ => unreachable!(), // If all subcommands are defined above, anything else is unreachable!()
     }
 }
 
 async fn get(matches: &ArgMatches) {
-    let client = login().await;
+    login().await;
     parse_config_flags(matches).await;
     if let Some(urls) = matches.get_many::<String>("URL") {
-        debug!("Login sucessful");
-        let url: Vec<String> = urls.map(|i| i.to_owned()).collect();
-        debug!("Collected args");
-        let (handles, download, worker) = dispatch_downloads(url, client)
+        let (download, worker) = dispatch_downloads(urls)
             .await
             .expect("Unable to dispatch download thread");
         let config = CONFIG.read().await;
         join!(
-            join_all(handles),
             consume_channel(download, config.downloads.into(),),
             consume_channel(worker, config.workers.into())
         );
@@ -88,29 +82,13 @@ async fn consume_channel(channel: ReceiveChannel, concurrency: usize) {
 }
 
 async fn search(matches: &ArgMatches) {
-    let client = login().await;
     if let Some(query) = matches.get_one::<String>("query") {
         let max = matches.get_one::<u32>("max").cloned();
         let result = match matches.get_one::<String>("filter") {
             Some(filter) => match filter.as_str() {
-                "artist" => {
-                    client
-                        .search
-                        .search_content::<Artist>("artists", query, max)
-                        .await
-                }
-                "track" => {
-                    client
-                        .search
-                        .search_content::<Track>("tracks", query, max)
-                        .await
-                }
-                "album" => {
-                    client
-                        .search
-                        .search_content::<Album>("albums", query, max)
-                        .await
-                }
+                "artist" => search_content::<Artist>("artists", query, max).await,
+                "track" => search_content::<Track>("tracks", query, max).await,
+                "album" => search_content::<Album>("albums", query, max).await,
                 _ => unreachable!(),
             },
             None => todo!(), //search all
@@ -122,19 +100,18 @@ async fn search(matches: &ArgMatches) {
     }
 }
 
-async fn logout() {
-    let config = CONFIG.read().await;
+type LoginResponse = Pin<Box<dyn Future<Output = Result<bool, Error>>>>;
+pub async fn login() {
+    let methods: [LoginResponse; 2] = [Box::pin(login_config()), Box::pin(login_web())];
 
-    match config.login_key.access_token.clone() {
-        Some(token) => match AuthClient::new(config.api_key.clone())
-            .logout(token.to_owned())
-            .await
-        {
-            Ok(_) => println!("Logout Sucessful"),
-            Err(e) => eprintln!("Error Logging out: {e}"),
-        },
-        None => println!("No Auth Token is configured to logout with"),
+    for method in methods {
+        match method.await {
+            Ok(_) => return,
+            Err(e) => eprintln!("{e}"),
+        }
     }
+
+    panic!("All Login methods failed")
 }
 
 fn autocomplete(matches: &ArgMatches) {
