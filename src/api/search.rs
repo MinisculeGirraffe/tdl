@@ -25,7 +25,7 @@ impl SearchClient {
         &self,
         url: &str,
         query: &str,
-        max: Option<u32>,
+        max: Option<usize>,
     ) -> Result<Table, Error>
     where
         T: DeserializeOwned + 'a + Tabled,

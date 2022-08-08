@@ -63,7 +63,7 @@ impl Default for DeviceAuthRequest {
 pub struct ItemResponse<T> {
     pub limit: usize,
     pub offset: usize,
-    pub total_number_of_items: u32,
+    pub total_number_of_items: usize,
     pub items: Vec<T>,
 }
 

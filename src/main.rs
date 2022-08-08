@@ -90,7 +90,7 @@ async fn consume_channel(channel: ReceiveChannel, concurrency: usize) {
 async fn search(matches: &ArgMatches) {
     let client = login().await;
     if let Some(query) = matches.get_one::<String>("query") {
-        let max = matches.get_one::<u32>("max").cloned();
+        let max = matches.get_one::<usize>("max").cloned();
         let result = match matches.get_one::<String>("filter") {
             Some(filter) => match filter.as_str() {
                 "artist" => {
