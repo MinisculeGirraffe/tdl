@@ -122,35 +122,37 @@ impl ApiClient {
         &self,
         url: &str,
         opts: Option<Vec<(String, String)>>,
-        max: Option<u32>,
+        max: Option<usize>,
     ) -> Result<Vec<T>, Error>
     where
         T: DeserializeOwned + 'a,
     {
         let mut limit = 50;
         let mut offset = 0;
-        let max = max.unwrap_or(u32::MAX);
-        let mut params = vec![
-            ("limit".to_string(), limit.to_string()),
-            ("offset".to_string(), offset.to_string()),
-        ];
+        let max = max.unwrap_or(usize::MAX);
+        let mut params = vec![("limit".to_string(), limit.to_string())];
         if let Some(opt) = opts {
             params.extend(opt);
-        }
+        };
 
         let mut result: Vec<T> = Vec::new();
         'req: loop {
+            params.push(("offset".to_string(), offset.to_string()));
             let json = self.get::<ItemResponse<T>>(url, Some(&params)).await?;
             limit = json.limit;
             // the minimum between the items in the response, and the total number of items requested
-            let item_limit = u32::min(json.total_number_of_items, max);
+            let item_limit = usize::min(json.total_number_of_items, max);
             for item in json.items {
-                if result.len() as u32 >= item_limit {
+                if result.len() >= item_limit {
                     break 'req;
                 }
                 result.push(item);
             }
             offset += limit;
+            params.pop();
+            if offset >= json.total_number_of_items {
+                break 'req;
+            }
         }
         Ok(result)
     }
