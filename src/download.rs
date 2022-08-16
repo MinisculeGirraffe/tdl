@@ -228,14 +228,22 @@ impl DownloadTask {
 
     async fn get_path(&self, track: &Track) -> Result<String, Error> {
         let config = &CONFIG.read().await;
-        let dl_path = &config.download_path;
-        let shell_path = shellexpand::full(&dl_path)?;
-
+        let mut dl_path = &config.download_path;
         let album = self.client.media.get_album(track.album.id).await?;
+	let mut max_volume;
+	match album.number_of_volumes {
+		Some(p) => max_volume=p,
+		None => max_volume=1
+	}
+	if max_volume>1 {
+		dl_path=&config.alt_download_path;
+	}
+        let shell_path = shellexpand::full(&dl_path)?;
         let album_name = album.title.as_ref().unwrap();
         let track_num_str = &track.track_number.to_string();
         let track_quality = &track.audio_quality.to_string();
         let track_id = &track.id.to_string();
+        let volume_number = &track.volume_number.to_string();
         let artist_id = &track.artist.id.to_string();
         let album_id = &track.album.id.to_string();
         let release = album.release_date.as_ref().unwrap();
@@ -245,6 +253,7 @@ impl DownloadTask {
             "{artist_id}" => sanitize(artist_id),
             "{album}" => sanitize(&album_name),
             "{album_id}" => sanitize(album_id),
+            "{volume_number}" => sanitize(volume_number),
             "{track_num}" => sanitize(track_num_str),
             "{track_name}" => sanitize(&track.title),
             "{track_id}" => sanitize(track_id),
@@ -260,7 +269,7 @@ impl DownloadTask {
 
 //Compile the regex once per execution
 lazy_static! {
-    pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\})").unwrap();
+    pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\}|\{volume_number\})").unwrap();
 }
 
 fn setup_multi_progress(show_progress: bool, refresh_rate: u8) -> MultiProgress {

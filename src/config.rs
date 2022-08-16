@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
     pub download_path: String,
+    pub alt_download_path: String,
     pub audio_quality: AudioQuality,
     pub show_progress: bool,
     pub progress_refresh_rate: u8,
@@ -63,6 +64,10 @@ pub fn get_config() -> Result<Settings, Error> {
     let config = Config::builder()
         .set_default(
             "download_path",
+            "$HOME/Music/{artist}/{album} [{album_id}] [{album_release_year}]/{track_num} - {track_name}",
+        )?
+        .set_default(
+            "alt_download_path",
             "$HOME/Music/{artist}/{album} [{album_id}] [{album_release_year}]/{track_num} - {track_name}",
         )?
         .set_default("audio_quality", "HI_RES")?
