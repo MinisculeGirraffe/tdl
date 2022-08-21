@@ -10,7 +10,7 @@ edition = "2021"
 clap = "3.2.15"
 clap_complete = "3.2.3"
 clap_complete_fig = "3.2.4"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.20.1", features = ["full"] }
 tokio-stream = "0.1.9"
 reqwest-middleware = "0.1.6"
 reqwest-retry = "0.1.5"
@@ -27,7 +27,7 @@ anyhow = "1.0.58"
 config = { version = "0.13.1", features = ["toml"] }
 lazy_static = "1.4.0"
 toml = "0.5.9"
-chrono = "0.4.19"
+chrono = "0.4.21"
 base64 = "0.13.0"
 regex = "1.6.0"
 metaflac = "0.2.5"
@@ -43,7 +43,7 @@ http-cache-reqwest = "0.5.0"
 
 
 [dependencies.serde_with]
-version = "1.14.0"
+version = "2.0.0"
 features = ["chrono"]
 
 [profile.release]
