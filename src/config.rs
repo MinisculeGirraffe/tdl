@@ -15,7 +15,6 @@ use tokio::sync::RwLock;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
-    pub download_path: FilePath,
     pub audio_quality: AudioQuality,
     pub show_progress: bool,
     pub progress_refresh_rate: u8,
@@ -24,7 +23,7 @@ pub struct Settings {
     pub workers: u8,
     pub download_cover: bool,
     pub cache_dir: String,
-    pub db_path: String,
+    pub download_paths: DownloadPathSettings,
     pub login_key: LoginKey,
     pub api_key: ApiKey,
 }
@@ -65,11 +64,27 @@ pub struct ApiKey {
     pub client_secret: String,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FilePath {
+pub struct DownloadPathSettings {
     pub base_path: String,
     pub artist: String,
     pub album: String,
     pub track: String,
+}
+
+trait UnwrapEmptyString<T: ToString> {
+    fn unwrap_empty_string(self) -> String;
+}
+
+impl<T> UnwrapEmptyString<T> for Option<T>
+where
+    T: ToString,
+{
+    fn unwrap_empty_string(self) -> String {
+        match self {
+            Some(val) => val.to_string(),
+            None => String::new(),
+        }
+    }
 }
 
 pub trait DownloadPath<T>
@@ -146,23 +161,19 @@ impl TokenMap<Album> for AlbumTokens {
     fn get_token(self, a: &Album) -> String {
         let a = match self {
             AlbumTokens::ID => a.id.to_string(),
-            AlbumTokens::Title => a.title.as_ref().unwrap().clone(),
-            AlbumTokens::Duration => a.duration.unwrap().to_string(),
-            AlbumTokens::NumberOfTracks => a.number_of_tracks.unwrap().to_string(),
-            AlbumTokens::Explicit => match a.explicit.unwrap() {
-                true => String::from("[E]"),
-                false => String::new(),
-            },
-            AlbumTokens::AudioQuality => a.audio_quality.unwrap().to_string(),
-            AlbumTokens::ReleaseDate => a.release_date.as_ref().unwrap().clone(),
+            AlbumTokens::Title => a.title.as_ref().unwrap_empty_string(),
+            AlbumTokens::Duration => a.duration.unwrap_empty_string(),
+            AlbumTokens::NumberOfTracks => a.number_of_tracks.unwrap_empty_string(),
+            AlbumTokens::Explicit => a.explicit.unwrap_empty_string(),
+            AlbumTokens::AudioQuality => a.audio_quality.unwrap_empty_string(),
+            AlbumTokens::ReleaseDate => a.release_date.as_ref().unwrap_empty_string(),
             AlbumTokens::ReleaseYear => a
                 .release_date
                 .as_ref()
-                .unwrap()
+                .unwrap_empty_string()
                 .split('-')
                 .next()
-                .unwrap()
-                .to_string(),
+                .unwrap_empty_string(),
         };
         sanitize(a)
     }
@@ -233,7 +244,7 @@ pub fn get_config() -> Result<Settings, Error> {
         .set_default("login_key.device_code", "")?
         .set_default("login_key.country_code", "")?
         .set_default("download_cover", true)?
-        .set_default("downloads", 1)?
+        .set_default("downloads", 3)?
         .set_default("workers", 1)?
         .set_default("cache_dir", get_cache_dir())?
         .set_default("login_key.access_token", "")?
@@ -244,14 +255,13 @@ pub fn get_config() -> Result<Settings, Error> {
             "api_key.client_secret",
             "VJKhDFqJPqvsPVNBV6ukXTJmwlvbttP7wlMlrc72se4=",
         )?
-        .set_default("db_path", get_db_dir())?
-        .set_default("download_path.base_path", "$HOME/Music")?
-        .set_default("download_path.artist", "{artist_name}")?
+        .set_default("download_paths.base_path", "$HOME/Music")?
+        .set_default("download_paths.artist", "{artist_name}")?
         .set_default(
-            "download_path.album",
-            "{album_name} [ {album_id} ] [{album_release_year}] ",
+            "download_paths.album",
+            "{album_name} [{album_id}] [{album_release_year}] ",
         )?
-        .set_default("download_path.track", "{track_num} - {track_name}")?
+        .set_default("download_paths.track", "{track_num} - {track_name}")?
         .add_source(File::new(CONFIG_FILE.as_str(), FileFormat::Toml).required(false))
         .build()?;
     let settings: Settings = config.try_deserialize()?;
@@ -272,10 +282,6 @@ fn get_cache_dir() -> String {
 
 fn get_config_file() -> String {
     format!("{}/config.toml", get_config_dir())
-}
-
-fn get_db_dir() -> String {
-    format!("{}/db.sqlite", get_config_dir())
 }
 
 lazy_static::lazy_static! {

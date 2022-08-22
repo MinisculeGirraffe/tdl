@@ -163,7 +163,12 @@ impl DownloadTask {
             .ok_or_else(|| anyhow!("Failed to get content length from {}", stream_url))?;
         pb.start_download(total_size, &track);
         debug!("Got Content Length: {total_size} for {}", track.get_info());
-        tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
+        tokio::fs::create_dir_all(
+            dl_path
+                .parent()
+                .ok_or_else(|| anyhow!("Parent Directory missing somehow"))?,
+        )
+        .await?;
         let file = File::create(dl_path).await?;
         // 1 MiB Write buffer to minimize syscalls for slow i/o
         // Reduces write CPU time from 24% to 7%.
@@ -210,7 +215,10 @@ impl DownloadTask {
     }
 
     pub async fn get_cover_data(&self, path: String, cover_id: &str) -> Result<Cover, Error> {
-        let dl_path = Path::new(&path).parent().unwrap().join("cover.jpg");
+        let dl_path = Path::new(&path)
+            .parent()
+            .ok_or_else(|| anyhow!("Parent Directory Doesn't exist"))?
+            .join("cover.jpg");
         if dl_path.exists() {
             let cover = Cover {
                 content_type: "application/jpeg".to_string(),
@@ -227,7 +235,7 @@ impl DownloadTask {
 
     async fn get_path(&self, track: &Track) -> Result<String, Error> {
         let config = &CONFIG.read().await;
-        let dl_path = &config.download_path;
+        let dl_path = &config.download_paths;
         let base_path = shellexpand::full(&dl_path.base_path)?.to_string();
 
         let album = self.client.media.get_album(track.album.id).await?;

@@ -155,7 +155,7 @@ impl AuthClient {
             .await?;
         if !req.status().is_success() {
             if req.status().is_client_error() {
-                return Err(Error::msg(req.status().canonical_reason().unwrap()));
+                return Err(Error::msg(req.status().canonical_reason().unwrap_or("")));
             } else {
                 return Err(Error::msg("Failed to check auth status"));
             }
