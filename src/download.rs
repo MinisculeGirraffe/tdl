@@ -227,7 +227,7 @@ impl DownloadTask {
 
     async fn get_path(&self, track: &Track) -> Result<String, Error> {
         let config = &CONFIG.read().await;
-        let dl_path = &config.download_paths;
+        let dl_path = &config.download_path;
         let base_path = shellexpand::full(&dl_path.base_path)?.to_string();
 
         let album = self.client.media.get_album(track.album.id).await?;

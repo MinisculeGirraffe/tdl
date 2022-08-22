@@ -15,7 +15,7 @@ use tokio::sync::RwLock;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
-    pub download_path: String,
+    pub download_path: FilePath,
     pub audio_quality: AudioQuality,
     pub show_progress: bool,
     pub progress_refresh_rate: u8,
@@ -27,7 +27,6 @@ pub struct Settings {
     pub db_path: String,
     pub login_key: LoginKey,
     pub api_key: ApiKey,
-    pub download_paths: FilePath,
 }
 
 impl Settings {
@@ -227,10 +226,6 @@ impl TokenMap<Track> for TrackTokens {
 
 pub fn get_config() -> Result<Settings, Error> {
     let config = Config::builder()
-        .set_default(
-            "download_path",
-            "$HOME/Music/{artist}/{album} [{album_id}] [{album_release_year}]/{track_num} - {track_name}",
-        )?
         .set_default("audio_quality", "HI_RES")?
         .set_default("show_progress", true)?
         .set_default("include_singles", true)?
@@ -249,11 +244,14 @@ pub fn get_config() -> Result<Settings, Error> {
             "api_key.client_secret",
             "VJKhDFqJPqvsPVNBV6ukXTJmwlvbttP7wlMlrc72se4=",
         )?
-        .set_default("db_path",  get_db_dir())?
-        .set_default("download_paths.base_path", "$HOME/Music")?
-        .set_default("download_paths.artist", "{artist_name}")?
-        .set_default("download_paths.album", "{album_name} [ {album_id} ] [{album_release_year}] ")?
-        .set_default("download_paths.track", "{track_num} - {track_name}")?
+        .set_default("db_path", get_db_dir())?
+        .set_default("download_path.base_path", "$HOME/Music")?
+        .set_default("download_path.artist", "{artist_name}")?
+        .set_default(
+            "download_path.album",
+            "{album_name} [ {album_id} ] [{album_release_year}] ",
+        )?
+        .set_default("download_path.track", "{track_num} - {track_name}")?
         .add_source(File::new(CONFIG_FILE.as_str(), FileFormat::Toml).required(false))
         .build()?;
     let settings: Settings = config.try_deserialize()?;
