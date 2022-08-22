@@ -109,8 +109,6 @@ impl DownloadTask {
             .get_items::<ItemResponseItem<Track>>(&url, None, None)
             .await?;
         for track in tracks {
-            self.progress
-                .println(format!("Getting Track Info for: {}", track.item.get_info()))?;
             let future = Box::pin(self.clone().download_track(track.item.id.to_string()));
             match self.clone().worker_channel.send(future).await {
                 Ok(_) => continue,
@@ -123,10 +121,6 @@ impl DownloadTask {
     async fn download_track(self, id: String) -> Result<bool, Error> {
         let track = self.client.media.get_track(&id).await?;
         let path_str = self.get_path(&track).await?;
-        self.progress.println(format!(
-            "Submitting Track to Download Queue: {}",
-            track.get_info()
-        ))?;
         let download = Box::pin(self.clone().download_file(track, path_str));
         match &self.dl_channel.send(download).await {
             Ok(_) => Ok(true),
