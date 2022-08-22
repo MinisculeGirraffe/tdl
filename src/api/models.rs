@@ -251,8 +251,8 @@ pub struct PlaybackManifest {
 impl PlaybackManifest {
     pub fn get_file_extension(&self) -> Option<&str> {
         match self.mime_type.as_str() {
-            "audio/mp4" => Some(".m4a"),
-            "audio/flac" => Some(".flac"),
+            "audio/mp4" => Some("m4a"),
+            "audio/flac" => Some("flac"),
             _ => None,
         }
     }

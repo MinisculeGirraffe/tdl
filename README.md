@@ -51,39 +51,76 @@ tdl autocomplete -s zsh > $FPATH/tdl.zsh
 
 Configs are stored in `~/.config/tdl/config.toml`, and will auto-generate with the default settings when the executable is ran. 
 
-### download_path
+### download_paths
 
-`download_path` will expand env variables along with shell accelerators such as `~`.
+The `download_paths` section in config is used to decide where files will be placed in the file system.
 
-In addition to specify the format to save tracks in, you can use the following tokens:
 
-- Artist: 
-  - `{artist}`
-    - Artist Name
-  - `{artist_id}`
-    - Unique ID from the Tidal API
-- Album: 
-  - `{album}`
-    - Album Title
-  - `{album_id}`
-    - Unique ID from the Tidal API: 
-  - `{album_release}`
-    - Full YYYY-MM-DD of relase
-  - `{album_release_year}`
-    - YYYY date of album release
 
-- Track:
-  - `{track_num}`
-  - `{track_name}`
-  - `{track_id}`
-  - `{quality}`
-    -  String literal of audio_quality
+`base_path` will expand env variables along with shell accelerators such as `~`. This is the parent folder all files will be placed under.
 
-Example Values: 
+Each of the following keys will create a nested folder structure in the following template:
+`{base_path}/{artist}/{album}/{track}`
 
-- `$HOME/Music/{artist}/{album} [{album_id}] [{album_release_year}]/{track_num} - {track_name}`
 
-- `$MUSIC_DIR/{artist} - [{artist_id}]/{album}/{track_name}`
+Examples: 
+
+``` toml
+[download_paths]
+base_path = '$HOME/Music'
+artist = '{artist_name}'
+album = '{album_name} [{album_id}] [{album_release_year}]'
+track = '{track_num} - {track_name} - {track_volume}'
+```
+Resulting Naming path: `/Users/username/Music/100 gecs/1000 gecs [129835816] [2019]/1 - 745 sticky - 1.flac`
+
+You can also specify any token under any key. A track will be able to use any key from the album or artist. However an album won't be able to use a track key.
+Keys can also be left blank to skip folder creation.
+
+``` toml
+[download_paths]
+base_path = '$HOME/Music'
+artist = ''
+album = '{artist_name} - {album_name} [{album_id}] [{album_release_year}]'
+track = '[{track_num}] - {artist_name} - {track_name} - {track_volume}'
+```
+
+Resulting Naming path: `/Users/username/Music/100 gecs - 1000 gecs [129835816] [2019]/[1] - 100 gecs - 745 sticky - 1.flac`
+
+Available Keys:
+
+Artist:
+
+|Token | Description | Example |
+| ----|-----|--|
+| `{artist_name}`| Artist Name| 100 Gecs
+| `{artist_id}` |  Unique ID from Tidal | 10828611
+
+Album:
+|Token | Description | Example |
+| ----|-----|--|
+| `{album_name}`| Album Title | 1000 Gecs |
+| `{album_id}` | Unique ID from Tidal | 192059802   |
+| `{album_duration}` | Duration in seconds of Album |3000 | 
+| `{album_tracks}` | Number of tracks in Album | 17
+| `{album_explicit}`| Shortcode if album is explicit, empty if false | E |
+| `{album_quality}` | String literal of `audio_quality` | HI_RES
+| `{album_release}`| YYYY-MM-DD string of album release date | 2020-07-05 |
+|`{album_release_year}` | YYYY string of album release | 2020 
+
+Track: 
+
+|Token | Description | Example |
+| ----|-----|--|
+  | `{track_id}` | Unique ID from Tidal | 129835817
+  | `{track_name}` | Name of Track | 745 Sticky 
+  | `{track_duration}` | Track Duration in Seconds | 120
+  | `{track_num}` | Number track appears on album | 7 
+  | `{track_volume}` | Volume number of track, if album includes multiple discs | 1 
+  | `{track_isrc}` | International Standard Recording Code of track | DEZ750500205
+  | `{track_explicit}` | Shortcode if album is explicit, empty if false  | E
+  | `{track_quality}` | String literal of `audio_quality` | HI_RES
+
 
 ### audio_quality
 

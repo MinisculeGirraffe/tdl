@@ -1,7 +1,6 @@
 use crate::api::{models::*, TidalClient, CLIENT};
 use crate::config::CONFIG;
 
-use crate::config::DownloadPath;
 use crate::models::*;
 use anyhow::{anyhow, Error};
 use futures::Future;
@@ -10,12 +9,13 @@ use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
 use std::cmp::min;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::try_join;
 
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
@@ -128,22 +128,19 @@ impl DownloadTask {
         }
     }
 
-    async fn download_file(self, track: Track, path: String) -> Result<bool, anyhow::Error> {
+    async fn download_file(self, track: Track, mut path: PathBuf) -> Result<bool, anyhow::Error> {
         let info = track.get_info();
         let pb = ProgressBar::new(self.progress.clone(), track.id);
         let playback_manifest = self.client.media.get_stream_url(track.id).await?;
-
-        let track_path = format!(
-            "{path}{}",
+        path.set_extension(
             playback_manifest
                 .get_file_extension()
-                .expect("Unable to determine track file extension")
+                .expect("Unable to determine track file extension"),
         );
 
         let stream_url = &playback_manifest.urls[0];
-        let dl_path = Path::new(&track_path);
 
-        if dl_path.exists() {
+        if path.exists() {
             debug!("Path exists");
             self.progress
                 .println(format!("File Exists | {}", track.get_info()))?;
@@ -158,12 +155,11 @@ impl DownloadTask {
         pb.start_download(total_size, &track);
         debug!("Got Content Length: {total_size} for {}", track.get_info());
         tokio::fs::create_dir_all(
-            dl_path
-                .parent()
+            path.parent()
                 .ok_or_else(|| anyhow!("Parent Directory missing somehow"))?,
         )
         .await?;
-        let file = File::create(dl_path).await?;
+        let file = File::create(path.clone()).await?;
         // 1 MiB Write buffer to minimize syscalls for slow i/o
         // Reduces write CPU time from 24% to 7%.
         let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000, file);
@@ -181,17 +177,15 @@ impl DownloadTask {
         writer.flush().await?;
 
         pb.set_message(format!("Writing metadata | {info}"));
-        self.write_metadata(track, track_path).await?;
+        self.write_metadata(track, path).await?;
         pb.println(format!("Download Complete | {info}"));
 
         Ok(true)
     }
 
-    async fn write_metadata(&self, track: Track, path: String) -> Result<(), Error> {
+    async fn write_metadata(&self, track: Track, path: PathBuf) -> Result<(), Error> {
         let fp = path.clone();
-        debug!("{fp}");
-        let mut tag =
-            tokio::task::spawn_blocking(move || Tag::read_from_path(Path::new(&fp))).await??;
+        let mut tag = tokio::task::spawn_blocking(move || Tag::read_from_path(fp)).await??;
         tag.set_vorbis("TITLE", vec![track.title]);
         tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
         tag.set_vorbis("ARTIST", vec![track.artist.name]);
@@ -208,7 +202,7 @@ impl DownloadTask {
         Ok(())
     }
 
-    pub async fn get_cover_data(&self, path: String, cover_id: &str) -> Result<Cover, Error> {
+    pub async fn get_cover_data(&self, path: PathBuf, cover_id: &str) -> Result<Cover, Error> {
         let dl_path = Path::new(&path)
             .parent()
             .ok_or_else(|| anyhow!("Parent Directory Doesn't exist"))?
@@ -227,28 +221,23 @@ impl DownloadTask {
         Ok(pic)
     }
 
-    async fn get_path(&self, track: &Track) -> Result<String, Error> {
+    async fn get_path(&self, track: &Track) -> Result<PathBuf, Error> {
         let config = &CONFIG.read().await;
         let dl_path = &config.download_paths;
-        let base_path = shellexpand::full(&dl_path.base_path)?.to_string();
+        let album_id = &track.album.id;
+        // The track artist can be different than the album artist
+        // important to use the album artist for naming.
+        // prefer to use that, otherwise default to the track artist
+        let artist_id = match track.album.artist.clone() {
+            Some(val) => val.id.to_string(),
+            None => track.artist.id.to_string(),
+        };
+        let (album, artist) = try_join!(
+            self.client.media.get_album(*album_id),
+            self.client.media.get_artist(&artist_id)
+        )?;
 
-        let album = self.client.media.get_album(track.album.id).await?;
-        let artist = self
-            .client
-            .media
-            .get_artist(&track.artist.id.to_string())
-            .await?;
-        let album_path = album.replace_path(&dl_path.album);
-        let artist_path = artist.replace_path(&dl_path.artist);
-        let track_path = track.clone().replace_path(&dl_path.track);
-
-        Ok(Path::new("")
-            .join(base_path)
-            .join(artist_path)
-            .join(album_path)
-            .join(track_path)
-            .display()
-            .to_string())
+        dl_path.get_track_path(track.clone(), album, artist)
     }
 }
 

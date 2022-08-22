@@ -11,6 +11,8 @@ use serde_with::serde_as;
 use serde_with::NoneAsEmptyString;
 use std::env::var;
 use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -69,6 +71,33 @@ pub struct DownloadPathSettings {
     pub artist: String,
     pub album: String,
     pub track: String,
+}
+
+impl DownloadPathSettings {
+    pub fn get_base_path(&self) -> Result<PathBuf, anyhow::Error> {
+        Ok(Path::new("").join(shellexpand::full(&self.base_path)?.to_string()))
+    }
+    pub fn get_artist_path(&self, artist: Artist) -> Result<PathBuf, anyhow::Error> {
+        let base = &self.get_base_path()?;
+        Ok(base.join(artist.replace_path(&self.artist)))
+    }
+    pub fn get_album_path(&self, album: Album, artist: Artist) -> Result<PathBuf, anyhow::Error> {
+        let base = &self.get_artist_path(artist.clone())?;
+        let path = artist.replace_path(&self.album);
+        Ok(base.join(album.replace_path(&path)))
+    }
+    pub fn get_track_path(
+        &self,
+        track: Track,
+        album: Album,
+        artist: Artist,
+    ) -> Result<PathBuf, anyhow::Error> {
+        let base = &self.get_album_path(album.clone(), artist.clone())?;
+        let mut path = track.replace_path(&self.track);
+        path = album.replace_path(&path);
+        path = artist.replace_path(&path);
+        Ok(base.join(path))
+    }
 }
 
 trait UnwrapEmptyString<T: ToString> {
@@ -164,7 +193,10 @@ impl TokenMap<Album> for AlbumTokens {
             AlbumTokens::Title => a.title.as_ref().unwrap_empty_string(),
             AlbumTokens::Duration => a.duration.unwrap_empty_string(),
             AlbumTokens::NumberOfTracks => a.number_of_tracks.unwrap_empty_string(),
-            AlbumTokens::Explicit => a.explicit.unwrap_empty_string(),
+            AlbumTokens::Explicit => match a.explicit.unwrap_or(false) {
+                true => String::from("E"),
+                false => String::new(),
+            },
             AlbumTokens::AudioQuality => a.audio_quality.unwrap_empty_string(),
             AlbumTokens::ReleaseDate => a.release_date.as_ref().unwrap_empty_string(),
             AlbumTokens::ReleaseYear => a
@@ -226,7 +258,7 @@ impl TokenMap<Track> for TrackTokens {
             TrackTokens::VolumeNumber => v.volume_number.to_string(),
             TrackTokens::ISRC => v.isrc.to_string(),
             TrackTokens::Explicit => match v.explicit {
-                true => String::from("[E]"),
+                true => String::from("E"),
                 false => String::new(),
             },
             TrackTokens::AudioQuality => v.audio_quality.to_string(),
