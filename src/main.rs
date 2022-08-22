@@ -1,5 +1,5 @@
-use std::io;
 use clap::ArgMatches;
+use std::io;
 use tdl::api::auth::AuthClient;
 use tdl::api::models::{Album, Artist, Track};
 use tdl::cli::{cli, parse_config_flags};
