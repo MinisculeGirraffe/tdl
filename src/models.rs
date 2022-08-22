@@ -14,7 +14,7 @@ impl ProgressBar {
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("{msg}\n{spinner:.green}")
-                .unwrap(),
+                .expect("Progress Bar Template is Invalid"),
         );
         pb.set_message(format!("Getting Track Details: {}", id));
 
@@ -24,7 +24,7 @@ impl ProgressBar {
     pub fn start_download(&self, length: u64, track: &Track) {
         self.set_length(length);
         self.set_style(ProgressStyle::default_bar()
-                        .template("{msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA: {eta})").unwrap()
+                        .template("{wide_msg}\n{spinner:.green} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec:4}, ETA: {eta:2})").expect("Progress Bar Template is invalid")
                         .progress_chars("#>-"));
         self.set_message(format!("Downloading File | {}", track.get_info()));
     }

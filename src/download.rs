@@ -5,19 +5,18 @@ use crate::models::*;
 use anyhow::{anyhow, Error};
 use futures::Future;
 use indicatif::{MultiProgress, ProgressDrawTarget};
-use lazy_static::lazy_static;
 use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
-use regex::{Captures, Regex};
-use sanitize_filename::sanitize;
 use std::cmp::min;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::try_join;
+
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
@@ -94,7 +93,7 @@ pub struct DownloadTask {
 impl DownloadTask {
     async fn download_artist(&self, id: String) -> Result<bool, Error> {
         self.progress.println("Getting Artist Albums")?;
-        let albums = self.client.media.get_album_items(&id).await?;
+        let albums = self.client.media.get_artist_albums(&id).await?;
         for album in albums {
             self.download_list(ActionKind::Album, album.id.to_string())
                 .await?;
@@ -110,8 +109,6 @@ impl DownloadTask {
             .get_items::<ItemResponseItem<Track>>(&url, None, None)
             .await?;
         for track in tracks {
-            self.progress
-                .println(format!("Getting Track Info for: {}", track.item.get_info()))?;
             let future = Box::pin(self.clone().download_track(track.item.id.to_string()));
             match self.clone().worker_channel.send(future).await {
                 Ok(_) => continue,
@@ -124,10 +121,6 @@ impl DownloadTask {
     async fn download_track(self, id: String) -> Result<bool, Error> {
         let track = self.client.media.get_track(&id).await?;
         let path_str = self.get_path(&track).await?;
-        self.progress.println(format!(
-            "Submitting Track to Download Queue: {}",
-            track.get_info()
-        ))?;
         let download = Box::pin(self.clone().download_file(track, path_str));
         match &self.dl_channel.send(download).await {
             Ok(_) => Ok(true),
@@ -135,22 +128,19 @@ impl DownloadTask {
         }
     }
 
-    async fn download_file(self, track: Track, path: String) -> Result<bool, anyhow::Error> {
+    async fn download_file(self, track: Track, mut path: PathBuf) -> Result<bool, anyhow::Error> {
         let info = track.get_info();
         let pb = ProgressBar::new(self.progress.clone(), track.id);
         let playback_manifest = self.client.media.get_stream_url(track.id).await?;
-
-        let track_path = format!(
-            "{path}{}",
+        path.set_extension(
             playback_manifest
                 .get_file_extension()
-                .expect("Unable to determine track file extension")
+                .expect("Unable to determine track file extension"),
         );
 
         let stream_url = &playback_manifest.urls[0];
-        let dl_path = Path::new(&track_path);
 
-        if dl_path.exists() {
+        if path.exists() {
             debug!("Path exists");
             self.progress
                 .println(format!("File Exists | {}", track.get_info()))?;
@@ -164,8 +154,12 @@ impl DownloadTask {
             .ok_or_else(|| anyhow!("Failed to get content length from {}", stream_url))?;
         pb.start_download(total_size, &track);
         debug!("Got Content Length: {total_size} for {}", track.get_info());
-        tokio::fs::create_dir_all(dl_path.parent().unwrap()).await?;
-        let file = File::create(dl_path).await?;
+        tokio::fs::create_dir_all(
+            path.parent()
+                .ok_or_else(|| anyhow!("Parent Directory missing somehow"))?,
+        )
+        .await?;
+        let file = File::create(path.clone()).await?;
         // 1 MiB Write buffer to minimize syscalls for slow i/o
         // Reduces write CPU time from 24% to 7%.
         let mut writer = tokio::io::BufWriter::with_capacity(1024 * 1000 * 1000, file);
@@ -183,17 +177,15 @@ impl DownloadTask {
         writer.flush().await?;
 
         pb.set_message(format!("Writing metadata | {info}"));
-        self.write_metadata(track, track_path).await?;
+        self.write_metadata(track, path).await?;
         pb.println(format!("Download Complete | {info}"));
 
         Ok(true)
     }
 
-    async fn write_metadata(&self, track: Track, path: String) -> Result<(), Error> {
+    async fn write_metadata(&self, track: Track, path: PathBuf) -> Result<(), Error> {
         let fp = path.clone();
-        debug!("{fp}");
-        let mut tag =
-            tokio::task::spawn_blocking(move || Tag::read_from_path(Path::new(&fp))).await??;
+        let mut tag = tokio::task::spawn_blocking(move || Tag::read_from_path(fp)).await??;
         tag.set_vorbis("TITLE", vec![track.title]);
         tag.set_vorbis("TRACKNUMBER", vec![track.track_number.to_string()]);
         tag.set_vorbis("ARTIST", vec![track.artist.name]);
@@ -210,8 +202,11 @@ impl DownloadTask {
         Ok(())
     }
 
-    pub async fn get_cover_data(&self, path: String, cover_id: &str) -> Result<Cover, Error> {
-        let dl_path = Path::new(&path).parent().unwrap().join("cover.jpg");
+    pub async fn get_cover_data(&self, path: PathBuf, cover_id: &str) -> Result<Cover, Error> {
+        let dl_path = Path::new(&path)
+            .parent()
+            .ok_or_else(|| anyhow!("Parent Directory Doesn't exist"))?
+            .join("cover.jpg");
         if dl_path.exists() {
             let cover = Cover {
                 content_type: "application/jpeg".to_string(),
@@ -226,41 +221,24 @@ impl DownloadTask {
         Ok(pic)
     }
 
-    async fn get_path(&self, track: &Track) -> Result<String, Error> {
+    async fn get_path(&self, track: &Track) -> Result<PathBuf, Error> {
         let config = &CONFIG.read().await;
-        let dl_path = &config.download_path;
-        let shell_path = shellexpand::full(&dl_path)?;
+        let dl_path = &config.download_paths;
+        let album_id = &track.album.id;
+        // The track artist can be different than the album artist
+        // important to use the album artist for naming.
+        // prefer to use that, otherwise default to the track artist
+        let artist_id = match track.album.artist.clone() {
+            Some(val) => val.id.to_string(),
+            None => track.artist.id.to_string(),
+        };
+        let (album, artist) = try_join!(
+            self.client.media.get_album(*album_id),
+            self.client.media.get_artist(&artist_id)
+        )?;
 
-        let album = self.client.media.get_album(track.album.id).await?;
-        let album_name = album.title.as_ref().unwrap();
-        let track_num_str = &track.track_number.to_string();
-        let track_quality = &track.audio_quality.to_string();
-        let track_id = &track.id.to_string();
-        let artist_id = &track.artist.id.to_string();
-        let album_id = &track.album.id.to_string();
-        let release = album.release_date.as_ref().unwrap();
-        let ymd: Vec<&str> = release.splitn(3, '-').collect();
-        let replaced = RE.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
-            "{artist}" => sanitize(&track.artist.name),
-            "{artist_id}" => sanitize(artist_id),
-            "{album}" => sanitize(&album_name),
-            "{album_id}" => sanitize(album_id),
-            "{track_num}" => sanitize(track_num_str),
-            "{track_name}" => sanitize(&track.title),
-            "{track_id}" => sanitize(track_id),
-            "{quality}" => sanitize(track_quality),
-            "{album_release}" => sanitize(&release),
-            "{album_release_year}" => sanitize(ymd[0]),
-            _ => panic!("matched no tokens on download_path string"),
-        });
-
-        Ok(replaced.to_string())
+        dl_path.get_track_path(track.clone(), album, artist)
     }
-}
-
-//Compile the regex once per execution
-lazy_static! {
-    pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\})").unwrap();
 }
 
 fn setup_multi_progress(show_progress: bool, refresh_rate: u8) -> MultiProgress {

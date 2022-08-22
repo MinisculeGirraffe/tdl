@@ -28,7 +28,10 @@ pub async fn login() -> TidalClient {
 
     for method in methods {
         match method.await {
-            Ok(v) => return v,
+            Ok(v) => {
+                debug!("Login sucessful");
+                return v;
+            }
             Err(e) => eprintln!("{e}"),
         }
     }
@@ -90,7 +93,7 @@ pub async fn login_config(client: AuthClient) -> Result<TidalClient, Error> {
             config.login_key.expires_after = Some(refresh.expires_in + now);
             config.login_key.access_token = Some(refresh.access_token);
             debug!("Attempting to save access token");
-            config.save().unwrap();
+            config.save().expect("Failed to Save Access Token");
             println!("Access Token Refreshed with Refresh Token");
         }
 

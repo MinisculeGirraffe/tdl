@@ -33,6 +33,10 @@ impl MediaClient {
         self.get::<Album>(&url, None).await
     }
 
+    pub async fn get_artist(&self, id: &str) -> Result<Artist, Error> {
+        let url = format!("https://api.tidal.com/v1/artists/{id}");
+        self.get::<Artist>(&url, None).await
+    }
     pub async fn get_stream_url(&self, id: usize) -> Result<PlaybackManifest, Error> {
         let url = format!("{}/tracks/{}/playbackinfopostpaywall", &self.api_base, id);
         let query = &[
@@ -54,8 +58,8 @@ impl MediaClient {
         }
     }
 
-    pub async fn get_album_items(&self, id: &str) -> Result<Vec<Album>, Error> {
-        let url = format!("https://api.tidal.com/v1/artists/{}/albums", id);
+    pub async fn get_artist_albums(&self, id: &str) -> Result<Vec<Album>, Error> {
+        let url = format!("https://api.tidal.com/v1/artists/{id}/albums");
         let mut albums: Vec<Album> = Vec::new();
         let album_req = self.get_items::<Album>(&url, None, None);
         if self.include_singles {

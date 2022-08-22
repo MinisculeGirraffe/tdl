@@ -87,9 +87,15 @@ impl ApiClient {
         Arc::new(Self {
             country_code: (
                 String::from("countryCode"),
-                config.login_key.country_code.unwrap(),
+                config
+                    .login_key
+                    .country_code
+                    .expect("Country code is not set in config"),
             ),
-            access_token: config.login_key.access_token.unwrap(),
+            access_token: config
+                .login_key
+                .access_token
+                .expect("Access Token is not present in config"),
             http_client: build_middleware_client(config.cache_dir),
             include_singles: config.include_singles,
             api_base: String::from("https://api.tidalhifi.com/v1"),
