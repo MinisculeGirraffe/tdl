@@ -1,16 +1,14 @@
 use crate::api::{models::*, TidalClient, CLIENT};
 use crate::config::CONFIG;
 
+use crate::config::DownloadPath;
 use crate::models::*;
 use anyhow::{anyhow, Error};
 use futures::Future;
 use indicatif::{MultiProgress, ProgressDrawTarget};
-use lazy_static::lazy_static;
 use log::{debug, info};
 use metaflac::block::PictureType::CoverFront;
 use metaflac::Tag;
-use regex::{Captures, Regex};
-use sanitize_filename::sanitize;
 use std::cmp::min;
 use std::path::Path;
 use std::pin::Pin;
@@ -18,6 +16,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
@@ -94,7 +93,7 @@ pub struct DownloadTask {
 impl DownloadTask {
     async fn download_artist(&self, id: String) -> Result<bool, Error> {
         self.progress.println("Getting Artist Albums")?;
-        let albums = self.client.media.get_album_items(&id).await?;
+        let albums = self.client.media.get_artist_albums(&id).await?;
         for album in albums {
             self.download_list(ActionKind::Album, album.id.to_string())
                 .await?;
@@ -228,39 +227,27 @@ impl DownloadTask {
 
     async fn get_path(&self, track: &Track) -> Result<String, Error> {
         let config = &CONFIG.read().await;
-        let dl_path = &config.download_path;
-        let shell_path = shellexpand::full(&dl_path)?;
+        let dl_path = &config.download_paths;
+        let base_path = shellexpand::full(&dl_path.base_path)?.to_string();
 
         let album = self.client.media.get_album(track.album.id).await?;
-        let album_name = album.title.as_ref().unwrap();
-        let track_num_str = &track.track_number.to_string();
-        let track_quality = &track.audio_quality.to_string();
-        let track_id = &track.id.to_string();
-        let artist_id = &track.artist.id.to_string();
-        let album_id = &track.album.id.to_string();
-        let release = album.release_date.as_ref().unwrap();
-        let ymd: Vec<&str> = release.splitn(3, '-').collect();
-        let replaced = RE.replace_all(&shell_path, |cap: &Captures| match &cap[0] {
-            "{artist}" => sanitize(&track.artist.name),
-            "{artist_id}" => sanitize(artist_id),
-            "{album}" => sanitize(&album_name),
-            "{album_id}" => sanitize(album_id),
-            "{track_num}" => sanitize(track_num_str),
-            "{track_name}" => sanitize(&track.title),
-            "{track_id}" => sanitize(track_id),
-            "{quality}" => sanitize(track_quality),
-            "{album_release}" => sanitize(&release),
-            "{album_release_year}" => sanitize(ymd[0]),
-            _ => panic!("matched no tokens on download_path string"),
-        });
+        let artist = self
+            .client
+            .media
+            .get_artist(&track.artist.id.to_string())
+            .await?;
+        let album_path = album.replace_path(&dl_path.album);
+        let artist_path = artist.replace_path(&dl_path.artist);
+        let track_path = track.clone().replace_path(&dl_path.track);
 
-        Ok(replaced.to_string())
+        Ok(Path::new("")
+            .join(base_path)
+            .join(artist_path)
+            .join(album_path)
+            .join(track_path)
+            .display()
+            .to_string())
     }
-}
-
-//Compile the regex once per execution
-lazy_static! {
-    pub static ref RE: Regex = Regex::new(r"(\{album\}|\{album_id\}|\{album_release\}|\{album_release_year\}|\{artist\}|\{artist_id\}|\{track_num\}|\{track_name\}|\{quality\})").unwrap();
 }
 
 fn setup_multi_progress(show_progress: bool, refresh_rate: u8) -> MultiProgress {

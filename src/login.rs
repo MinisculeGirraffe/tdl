@@ -28,7 +28,10 @@ pub async fn login() -> TidalClient {
 
     for method in methods {
         match method.await {
-            Ok(v) => return v,
+            Ok(v) => {
+                debug!("Login sucessful");
+                return v;
+            }
             Err(e) => eprintln!("{e}"),
         }
     }

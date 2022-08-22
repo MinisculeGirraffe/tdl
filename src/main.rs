@@ -1,35 +1,28 @@
-mod api;
-mod cli;
-mod config;
-mod download;
-mod login;
-mod models;
-
 use std::io;
-
-use crate::config::CONFIG;
-use crate::login::*;
-
-use api::auth::AuthClient;
-use api::models::{Album, Artist, Track};
-
 use clap::ArgMatches;
+use tdl::api::auth::AuthClient;
+use tdl::api::models::{Album, Artist, Track};
+use tdl::cli::{cli, parse_config_flags};
+use tdl::config::CONFIG;
+use tdl::download::dispatch_downloads;
+use tdl::download::ReceiveChannel;
+use tdl::login::*;
+
 use clap_complete::{generate, Shell};
 use clap_complete_fig::Fig;
-use cli::{cli, parse_config_flags};
-use download::dispatch_downloads;
+
 use env_logger::Env;
 use futures::future::join_all;
 use futures::StreamExt;
 
-use download::ReceiveChannel;
 use log::debug;
 use tokio::join;
 use tokio_stream::wrappers::ReceiverStream;
 
 #[tokio::main]
 async fn main() {
-    // read from config to always trigger initialization, then release immediately lock
+    // read from config to always trigger initialization of the default config if it doesn't exist
+    // then release lock immediately.
     {
         CONFIG.read().await;
     }
@@ -49,9 +42,9 @@ async fn main() {
 
 async fn get(matches: &ArgMatches) {
     let client = login().await;
+
     parse_config_flags(matches).await;
     if let Some(urls) = matches.get_many::<String>("URL") {
-        debug!("Login sucessful");
         let url: Vec<String> = urls.map(|i| i.to_owned()).collect();
         debug!("Collected args");
         let (handles, download, worker) = dispatch_downloads(url, client)
@@ -124,7 +117,6 @@ async fn search(matches: &ArgMatches) {
 
 async fn logout() {
     let config = CONFIG.read().await;
-
     match config.login_key.access_token.clone() {
         Some(token) => match AuthClient::new(config.api_key.clone())
             .logout(token.to_owned())
