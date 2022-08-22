@@ -72,9 +72,11 @@ artist = '{artist_name}'
 album = '{album_name} [{album_id}] [{album_release_year}]'
 track = '{track_num} - {track_name} - {track_volume}'
 ```
-Resulting Naming path: `/Users/username/Music/100 gecs/1000 gecs [129835816] [2019]/1 - 745 sticky - 1.flac`
+Resulting Naming path:
+`/Users/username/Music/100 gecs/1000 gecs [129835816] [2019]/1 - 745 sticky - 1.flac`
 
-You can also specify any token under any key. A track will be able to use any key from the album or artist. However an album won't be able to use a track key.
+You can also specify any token under any key so long as it's not a child. A track will be able to use any key from the album or artist. However an album won't be able to use a track key.
+
 Keys can also be left blank to skip folder creation.
 
 ``` toml
@@ -85,7 +87,8 @@ album = '{artist_name} - {album_name} [{album_id}] [{album_release_year}]'
 track = '[{track_num}] - {artist_name} - {track_name} - {track_volume}'
 ```
 
-Resulting Naming path: `/Users/username/Music/100 gecs - 1000 gecs [129835816] [2019]/[1] - 100 gecs - 745 sticky - 1.flac`
+Resulting Naming path:
+`/Users/username/Music/100 gecs - 1000 gecs [129835816] [2019]/[1] - 100 gecs - 745 sticky - 1.flac`
 
 Available Keys:
 
