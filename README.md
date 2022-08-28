@@ -5,11 +5,12 @@ tdl is a rust implementation of the Python Script [Tidal-Media-Downloader](https
 
 tdl offers significant performance improvements over the original python script by utilizing asynchronous multi-threaded concurrency.
 
-How much more performant is it?
+### How much more performant is it?
 
-In basic testing on my laptop is typically can complete the same download tasks in half the time, and ~3-4x less cpu time. 
+In basic testing on my laptop without any CPU/Disk contention, tdl can typically complete the same download tasks in half the time, and 3-4x less cpu time. 
 
 tdl: `1.44s user 2.02s system 36% cpu 9.480 total`
+
 tidal-dl:`4.20s user 4.22s system 43% cpu 19.434 total`
 
 In situations where there is CPU contention, or very high network throughput this difference can be as high as 20x-50x. 
