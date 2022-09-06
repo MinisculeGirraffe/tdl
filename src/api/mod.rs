@@ -149,7 +149,7 @@ impl ApiClient {
             // the minimum between the items in the response, and the total number of items requested
             let item_limit = usize::min(json.total_number_of_items, max);
             for item in json.items {
-                if result.len() >= item_limit - offset {
+                if result.len() >= item_limit {
                     break 'req;
                 }
                 result.push(item);
