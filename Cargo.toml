@@ -12,8 +12,8 @@ clap_complete = "3.2.3"
 clap_complete_fig = "3.2.4"
 tokio = { version = "1.20.1", features = ["full"] }
 tokio-stream = "0.1.9"
-reqwest-middleware = "0.1.6"
-reqwest-retry = "0.1.5"
+reqwest-middleware = "0.2.3"
+reqwest-retry = "0.2.3"
 reqwest = { version = "0.11.11", features = [
     "json",
     "rustls-tls",
@@ -35,11 +35,11 @@ log = "0.4.17"
 env_logger = "0.9.0"
 shellexpand = "2.1.0"
 futures = "0.3.21"
-indicatif = {version = "0.17.0", features = ["improved_unicode"]}
+indicatif = { version = "0.17.0", features = ["improved_unicode"] }
 console = "0.15.0"
 tabled = "0.8.0"
 sanitize-filename = "0.4.0"
-http-cache-reqwest = "0.5.0"
+http-cache-reqwest = "0.11.1"
 phf = { version = "0.11", features = ["macros"] }
 
 [dependencies.serde_with]
