@@ -6,7 +6,7 @@ use self::{
 };
 use crate::config::Settings;
 use anyhow::Error;
-use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache};
+use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use log::debug;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
@@ -44,11 +44,16 @@ fn build_middleware_client(cache_dir: String) -> ClientWithMiddleware {
         min_retry_interval: std::time::Duration::from_millis(2000),
         backoff_exponent: 2,
     };
-    let cache_manager = CACacheManager { path: cache_dir };
+    let cache_manager = CACacheManager {
+        path: cache_dir.into(),
+    };
     let cache_policy = HttpCache {
         mode: CacheMode::Default,
         manager: cache_manager,
-        options: None,
+        options: HttpCacheOptions {
+            cache_options: None,
+            cache_key: None,
+        },
     };
 
     ClientBuilder::new(reqwest)
